@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arbeitszeit</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <section id="mainView">
+        <header>
+          <div>
+            <p class="eyebrow">HEUTE</p>
+            <h1>Arbeitszeit</h1>
+          </div>
+          <button id="openSettings" class="icon-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
+            <span aria-hidden="true">⚙</span>
+          </button>
+        </header>
+
+        <section class="summary" aria-live="polite">
+          <div><span>Gearbeitet</span><strong id="workedDisplay">0:00</strong></div>
+          <div><span>Sollzeit</span><strong id="targetDisplay">8:00</strong></div>
+          <div id="balanceCard" class="balance neutral">
+            <span id="balanceLabel">Saldo</span><strong id="balanceDisplay">−8:00</strong>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="time-grid">
+            <div class="field">
+              <label for="workStart">Arbeitsbeginn</label>
+              <input id="workStart" class="time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="workEnd">Feierabend</label>
+              <input id="workEnd" class="time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="section-heading">
+            <div><h2>Pausen</h2><p>Manuell oder ab jetzt hinzufügen</p></div>
+            <button id="addBreak" class="secondary small" type="button">+ Manuell</button>
+          </div>
+
+          <div class="quick-breaks" aria-label="Schnellpause hinzufügen">
+            <button id="addBreak30" class="quick-break" type="button" data-duration="30">
+              <strong>30</strong><span>Min Pause</span>
+            </button>
+            <button id="addBreak60" class="quick-break" type="button" data-duration="60">
+              <strong>60</strong><span>Min Pause</span>
+            </button>
+          </div>
+
+          <div id="breakList" class="break-list"></div>
+          <div id="breakPager" class="break-pager" hidden>
+            <button id="previousBreakPage" class="pager-button" type="button" aria-label="Vorherige Pausen">←</button>
+            <span id="breakPageLabel"></span>
+            <button id="nextBreakPage" class="pager-button" type="button" aria-label="Nächste Pausen">→</button>
+          </div>
+          <p id="emptyBreaks" class="empty">Noch keine Pause erfasst.</p>
+        </section>
+
+        <p id="message" class="message" role="status"></p>
+
+        <footer>
+          <button id="setStartNow" class="secondary" type="button">Start jetzt</button>
+          <button id="setEndNow" class="primary" type="button">Feierabend jetzt</button>
+          <button id="resetDay" class="ghost" type="button">Neuen Tag beginnen</button>
+        </footer>
+      </section>
+
+      <section id="settingsView" hidden>
+        <header class="settings-header">
+          <button id="closeSettings" class="icon-button back-button" type="button" aria-label="Zurück zur Zeiterfassung">
+            <span aria-hidden="true">←</span>
+          </button>
+          <div><p class="eyebrow">KONFIGURATION</p><h1>Einstellungen</h1></div>
+        </header>
+
+        <section class="card settings-card">
+          <div class="field">
+            <label for="targetTime">Tägliche Sollzeit</label>
+            <input id="targetTime" class="time-input" type="text" inputmode="numeric" maxlength="5" value="08:00" placeholder="HH:MM" autocomplete="off" />
+            <p class="hint">Zum Beispiel 800, 0800 oder 8:00</p>
+          </div>
+
+          <fieldset>
+            <legend>Darstellung</legend>
+            <div class="theme-options">
+              <button class="theme-option" type="button" data-theme-option="light" aria-pressed="true">
+                <span class="theme-preview light-preview" aria-hidden="true"></span>Hell
+              </button>
+              <button class="theme-option" type="button" data-theme-option="dark" aria-pressed="false">
+                <span class="theme-preview dark-preview" aria-hidden="true"></span>Dunkel
+              </button>
+            </div>
+          </fieldset>
+        </section>
+
+        <p class="settings-note">Änderungen werden automatisch gespeichert.</p>
+      </section>
+    </main>
+
+    <template id="breakTemplate">
+      <div class="break-row">
+        <div class="field">
+          <label>Von</label>
+          <input class="break-start time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Bis</label>
+          <input class="break-end time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" />
+        </div>
+        <button class="remove-break" type="button" aria-label="Pause entfernen" title="Pause entfernen">×</button>
+      </div>
+    </template>
+
+    <template id="fixedBreakTemplate">
+      <div class="fixed-break-row">
+        <div>
+          <strong class="fixed-break-duration"></strong>
+          <span>feste Pause</span>
+        </div>
+        <button class="remove-break" type="button" aria-label="Pause entfernen" title="Pause entfernen">×</button>
+      </div>
+    </template>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
