@@ -1,472 +1,289 @@
-const STORAGE_KEY = "workTimeState";
+import { formatDate, localDate } from "./dates.js";
+import { dailyTarget, weeklyTarget } from "./statistics-calculations.js";
+import { calculateWork, currentTime, formatDuration, formatTimeWhileTyping, normalizeTime } from "./time-calculations.js";
+import { applyTheme, onDataChanged, openWindow, send } from "./storage.js";
 
-const elements = {
-  mainView: document.querySelector("#mainView"),
-  settingsView: document.querySelector("#settingsView"),
-  openSettings: document.querySelector("#openSettings"),
-  closeSettings: document.querySelector("#closeSettings"),
-  targetTime: document.querySelector("#targetTime"),
-  workStart: document.querySelector("#workStart"),
-  workEnd: document.querySelector("#workEnd"),
-  breakList: document.querySelector("#breakList"),
-  emptyBreaks: document.querySelector("#emptyBreaks"),
-  breakTemplate: document.querySelector("#breakTemplate"),
-  fixedBreakTemplate: document.querySelector("#fixedBreakTemplate"),
-  breakPager: document.querySelector("#breakPager"),
-  breakPageLabel: document.querySelector("#breakPageLabel"),
-  previousBreakPage: document.querySelector("#previousBreakPage"),
-  nextBreakPage: document.querySelector("#nextBreakPage"),
-  addBreak: document.querySelector("#addBreak"),
-  quickBreakButtons: [...document.querySelectorAll(".quick-break")],
-  themeButtons: [...document.querySelectorAll("[data-theme-option]")],
-  setStartNow: document.querySelector("#setStartNow"),
-  setEndNow: document.querySelector("#setEndNow"),
-  resetDay: document.querySelector("#resetDay"),
-  workedDisplay: document.querySelector("#workedDisplay"),
-  targetDisplay: document.querySelector("#targetDisplay"),
-  balanceDisplay: document.querySelector("#balanceDisplay"),
-  balanceCard: document.querySelector("#balanceCard"),
-  balanceLabel: document.querySelector("#balanceLabel"),
-  message: document.querySelector("#message"),
-};
-
-let state = {
-  targetTime: "08:00",
-  workStart: "",
-  workEnd: "",
-  breaks: [],
-  theme: "light",
-};
-let breakCounter = 0;
-let breakPage = 0;
+const $ = selector => document.querySelector(selector);
+let data, view, queue = Promise.resolve(), pending = 0, external = null, version = 0, busy = true;
+let unsaved = false, stale = false;
+let breakPage = 0, breakCounter = 0;
 const BREAKS_PER_PAGE = 2;
 
-function formatTimeWhileTyping(value) {
-  const cleaned = value.replace(/[^\d:]/g, "");
-
-  if (cleaned.includes(":")) {
-    const [hours = "", ...minuteParts] = cleaned.split(":");
-    const minutes = minuteParts.join("");
-    return `${hours.slice(0, 2)}:${minutes.slice(0, 2)}`;
-  }
-
-  const digits = cleaned.slice(0, 4);
-  if (digits.length < 2) return digits;
-
-  if (digits.length === 2) {
-    const firstTwo = Number(digits);
-    return Number(digits[0]) > 2 || firstTwo > 23
-      ? `${digits[0]}:${digits[1]}`
-      : digits;
-  }
-
-  if (digits.length === 3) {
-    return Number(digits.slice(0, 2)) <= 23
-      ? `${digits.slice(0, 2)}:${digits[2]}`
-      : `${digits[0]}:${digits.slice(1)}`;
-  }
-
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+function showError(error) {
+  const target = $("#settingsView").hidden ? $("#error") : $("#settingsError");
+  target.textContent = error.message;
+  target.hidden = false;
 }
 
-function normalizeTime(value) {
-  const cleaned = value.trim().replace(/[^\d:]/g, "");
-  if (!cleaned) return "";
+function clearErrors() {
+  $("#error").hidden = true;
+  $("#settingsError").hidden = true;
+}
 
-  let hours;
-  let minutes;
-
-  if (cleaned.includes(":")) {
-    const parts = cleaned.split(":");
-    if (parts.length !== 2 || !parts[0]) return null;
-    hours = Number(parts[0]);
-    minutes = parts[1] === "" ? 0 : Number(parts[1]);
+function acceptExternal(updated) {
+  const draftChanged = updated.draftRevision !== data.draftRevision;
+  data = updated;
+  if (unsaved && draftChanged) {
+    stale = true;
+    applyTheme(data.settings.theme);
+    showError(new Error("Die Erfassung wurde inzwischen geändert. Deine noch ungesicherten Eingaben bleiben sichtbar. Bitte sichere sie bei Bedarf und wähle „Tag zurücksetzen“."));
+  } else if (draftChanged && !unsaved) {
+    view = structuredClone(data.draft);
+    render();
   } else {
-    const digits = cleaned.replace(/\D/g, "");
-    if (digits.length <= 2) {
-      hours = Number(digits);
-      minutes = 0;
-    } else if (digits.length === 3) {
-      hours = Number(digits[0]);
-      minutes = Number(digits.slice(1));
-    } else if (digits.length === 4) {
-      hours = Number(digits.slice(0, 2));
-      minutes = Number(digits.slice(2));
-    } else {
-      return null;
-    }
+    applyTheme(data.settings.theme);
+    renderSettings();
+    calculate();
   }
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours > 23 || minutes > 59) {
-    return null;
-  }
-
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function timeToMinutes(value) {
-  const normalized = normalizeTime(value);
-  if (!normalized) return null;
-  const [hours, minutes] = normalized.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function minutesToClock(totalMinutes) {
-  const wrapped = ((totalMinutes % 1440) + 1440) % 1440;
-  return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
-}
-
-function currentTime() {
-  const now = new Date();
-  return minutesToClock(now.getHours() * 60 + now.getMinutes());
-}
-
-function formatDuration(totalMinutes, signed = false) {
-  const rounded = Math.round(totalMinutes);
-  const absolute = Math.abs(rounded);
-  const hours = Math.floor(absolute / 60);
-  const minutes = absolute % 60;
-  const sign = signed ? (rounded > 0 ? "+" : rounded < 0 ? "−" : "±") : "";
-  return `${sign}${hours}:${String(minutes).padStart(2, "0")}`;
-}
-
-function getNormalizedInput(input) {
-  const normalized = normalizeTime(input.value);
-  return normalized === null ? "" : normalized;
-}
-
-function collectStateFromForm() {
-  const targetTime = normalizeTime(elements.targetTime.value);
-  const workStart = normalizeTime(elements.workStart.value);
-  const workEnd = normalizeTime(elements.workEnd.value);
-
-  if (targetTime) state.targetTime = targetTime;
-  if (workStart !== null) state.workStart = workStart;
-  if (workEnd !== null) state.workEnd = workEnd;
-
-  state.breaks = [...elements.breakList.children].map((row) => {
-    if (row.dataset.kind === "fixed") {
-      return { duration: Number(row.dataset.duration) };
+function enqueue(task) {
+  pending++;
+  const next = queue.then(task).catch(error => { showError(error); throw error; }).finally(() => {
+    pending--;
+    if (!pending && external && data && external.revision > data.revision) {
+      acceptExternal(external);
     }
-    return {
-      start: getNormalizedInput(row.querySelector(".break-start")),
-      end: getNormalizedInput(row.querySelector(".break-end")),
-    };
+    if (!pending) external = null;
   });
+  queue = next.catch(() => {});
+  return next;
 }
 
-async function saveState() {
-  collectStateFromForm();
-  await chrome.storage.local.set({ [STORAGE_KEY]: state });
+function formFields() {
+  return {
+    kind: $("#vacationDay").checked ? "vacation" : $("#compensationDay").checked ? "compensation" : "work",
+    workStart: $("#workStart").value,
+    workEnd: $("#workEnd").value,
+    breaks: [...$("#breakList").children].map(row => row.dataset.kind === "fixed"
+      ? { duration: Number(row.dataset.duration) }
+      : { start: row.querySelector(".break-start").value, end: row.querySelector(".break-end").value }),
+  };
+}
+
+function capture() {
+  const fields = formFields();
+  if (fields.kind !== view.kind) view.vacationCreditMinutes = fields.kind === "vacation" ? data.settings.vacationCreditMinutes : null;
+  Object.assign(view, fields);
+  unsaved = true;
+  version++;
+  return fields;
+}
+
+async function persist(fields, capturedVersion) {
+  if (stale) throw new Error("Diese Erfassung wurde in einem anderen Fenster geändert. Deine Eingaben bleiben sichtbar; bitte vor „Tag zurücksetzen“ bei Bedarf sichern.");
+  data = await send({ type: "saveDraft", fields, expectedDraftRevision: data.draftRevision });
+  if (version === capturedVersion) { view = structuredClone(data.draft); unsaved = false; }
+  applyTheme(data.settings.theme);
   calculate();
 }
 
-function showTimeError(input) {
-  input.setAttribute("aria-invalid", "true");
-  elements.message.textContent = "Bitte eine gültige Uhrzeit zwischen 00:00 und 23:59 eingeben.";
+function edited() {
+  if (busy || !data) return;
+  clearErrors();
+  const fields = capture(), capturedVersion = version;
+  calculate();
+  enqueue(() => persist(fields, capturedVersion)).catch(() => {});
+}
+
+function setBusy(value) {
+  busy = value;
+  for (const element of document.querySelectorAll("button, input")) element.disabled = value;
+  if (!value) {
+    $("#timeFields").disabled = view.kind !== "work";
+    const liveAllowed = view.kind === "work" && view.date === localDate();
+    $("#setEndNow").disabled = !liveAllowed;
+    updateBreakPagination();
+  }
+}
+
+function transition(type, date) {
+  if (busy) return;
+  clearErrors();
+  const fields = capture(), capturedVersion = version;
+  setBusy(true);
+  enqueue(async () => {
+    // Reset bypasses history saving and the date-change operation entirely.
+    if (type !== "resetDay") await persist(fields, capturedVersion);
+    data = await send({ type, date, expectedDraftRevision: data.draftRevision });
+    stale = false;
+    unsaved = false;
+    view = structuredClone(data.draft);
+    breakPage = 0;
+    render();
+  }).catch(() => { $("#dayDate").value = view.date ?? ""; }).finally(() => {
+    setBusy(false);
+    if (type !== "selectDate") $("#workStart").focus();
+  });
 }
 
 function attachTimeInput(input) {
   input.addEventListener("input", () => {
-    const formatted = formatTimeWhileTyping(input.value);
-    if (input.value !== formatted) input.value = formatted;
+    input.value = formatTimeWhileTyping(input.value);
     input.removeAttribute("aria-invalid");
-
-    const normalized = normalizeTime(input.value);
-    if (normalized !== null) saveState();
+    edited();
   });
-
   input.addEventListener("blur", () => {
-    if (!input.value) {
-      input.removeAttribute("aria-invalid");
-      saveState();
-      return;
-    }
-
+    if (busy) return;
     const normalized = normalizeTime(input.value);
-    if (!normalized) {
-      showTimeError(input);
-      return;
+    if (normalized === null) {
+      input.setAttribute("aria-invalid", "true");
+      showError(new Error("Bitte gültige Uhrzeiten zwischen 00:00 und 23:59 eingeben."));
+    } else if (input.value !== normalized) { input.value = normalized; edited(); }
+  });
+  input.addEventListener("keydown", event => { if (event.key === "Enter") input.blur(); });
+}
+
+function addBreakRow(pause = { start: "", end: "" }, focus = false) {
+  const fixed = "duration" in pause;
+  const fragment = $(fixed ? "#fixedBreakTemplate" : "#breakTemplate").content.cloneNode(true);
+  const row = fragment.firstElementChild;
+  row.dataset.kind = fixed ? "fixed" : "timed";
+  if (fixed) {
+    row.dataset.duration = pause.duration;
+    row.querySelector(".fixed-break-duration").textContent = `${pause.duration} Min`;
+  } else {
+    const id = ++breakCounter;
+    for (const [index, part] of ["start", "end"].entries()) {
+      const input = row.querySelector(`.break-${part}`);
+      input.id = `break-${id}-${part}`;
+      input.value = pause[part];
+      row.querySelectorAll("label")[index].htmlFor = input.id;
+      attachTimeInput(input);
     }
-
-    input.value = normalized;
-    input.removeAttribute("aria-invalid");
-    saveState();
-  });
-
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") input.blur();
-  });
-}
-
-function addBreakRow(breakData = { start: "", end: "" }, shouldSave = true, shouldFocus = false) {
-  const fragment = elements.breakTemplate.content.cloneNode(true);
-  const row = fragment.querySelector(".break-row");
-  const startInput = row.querySelector(".break-start");
-  const endInput = row.querySelector(".break-end");
-  const labels = row.querySelectorAll("label");
-  const id = ++breakCounter;
-
-  row.dataset.kind = "timed";
-  startInput.id = `break-${id}-start`;
-  endInput.id = `break-${id}-end`;
-  labels[0].htmlFor = startInput.id;
-  labels[1].htmlFor = endInput.id;
-  startInput.value = breakData.start || "";
-  endInput.value = breakData.end || "";
-  attachTimeInput(startInput);
-  attachTimeInput(endInput);
-
+  }
   row.querySelector(".remove-break").addEventListener("click", () => {
-    row.remove();
-    updateBreakPagination();
-    saveState();
+    row.remove(); updateBreakPagination(); edited();
   });
-
-  elements.breakList.append(row);
-  if (shouldFocus) breakPage = Math.ceil(elements.breakList.children.length / BREAKS_PER_PAGE) - 1;
+  $("#breakList").append(fragment);
+  if (focus) breakPage = Math.floor(($("#breakList").children.length - 1) / BREAKS_PER_PAGE);
   updateBreakPagination();
-  if (shouldSave) saveState();
-  if (shouldFocus) startInput.focus();
-}
-
-function addFixedBreakRow(duration, shouldSave = true) {
-  const fragment = elements.fixedBreakTemplate.content.cloneNode(true);
-  const row = fragment.querySelector(".fixed-break-row");
-  row.dataset.kind = "fixed";
-  row.dataset.duration = String(duration);
-  row.querySelector(".fixed-break-duration").textContent = `${duration} Min`;
-  row.querySelector(".remove-break").addEventListener("click", () => {
-    row.remove();
-    updateBreakPagination();
-    saveState();
-  });
-
-  elements.breakList.append(row);
-  breakPage = Math.ceil(elements.breakList.children.length / BREAKS_PER_PAGE) - 1;
-  updateBreakPagination();
-  if (shouldSave) saveState();
+  if (focus && !fixed) row.querySelector("input").focus();
 }
 
 function updateBreakPagination() {
-  const rows = [...elements.breakList.children];
-  const pageCount = Math.max(1, Math.ceil(rows.length / BREAKS_PER_PAGE));
-  breakPage = Math.max(0, Math.min(breakPage, pageCount - 1));
-
-  rows.forEach((row, index) => {
-    row.hidden = Math.floor(index / BREAKS_PER_PAGE) !== breakPage;
-  });
-
-  elements.emptyBreaks.hidden = rows.length > 0;
-  elements.breakPager.hidden = rows.length <= BREAKS_PER_PAGE;
-  elements.breakPageLabel.textContent = `${breakPage + 1} / ${pageCount}`;
-  elements.previousBreakPage.disabled = breakPage === 0;
-  elements.nextBreakPage.disabled = breakPage === pageCount - 1;
-}
-
-function toTimelineMinute(value, workStartMinute) {
-  let minute = timeToMinutes(value);
-  if (minute === null) return null;
-  if (minute < workStartMinute) minute += 1440;
-  return minute;
-}
-
-function mergeIntervals(intervals) {
-  const sorted = intervals.sort((a, b) => a[0] - b[0]);
-  const merged = [];
-
-  for (const interval of sorted) {
-    const last = merged[merged.length - 1];
-    if (!last || interval[0] > last[1]) {
-      merged.push([...interval]);
-    } else {
-      last[1] = Math.max(last[1], interval[1]);
-    }
-  }
-
-  return merged;
+  const rows = [...$("#breakList").children];
+  const count = Math.max(1, Math.ceil(rows.length / BREAKS_PER_PAGE));
+  breakPage = Math.max(0, Math.min(breakPage, count - 1));
+  rows.forEach((row, index) => { row.hidden = Math.floor(index / BREAKS_PER_PAGE) !== breakPage; });
+  $("#emptyBreaks").hidden = rows.length > 0;
+  $("#breakPager").hidden = count === 1;
+  $("#breakPageLabel").textContent = `${breakPage + 1} / ${count}`;
+  $("#previousBreakPage").disabled = busy || breakPage === 0;
+  $("#nextBreakPage").disabled = busy || breakPage === count - 1;
 }
 
 function calculate() {
-  const startMinute = timeToMinutes(state.workStart);
-  const target = timeToMinutes(state.targetTime) ?? 0;
-  let worked = 0;
-  let incompleteBreaks = 0;
-  const fixedPauseMinutes = state.breaks.reduce(
-    (total, pause) => total + (Number(pause.duration) || 0),
-    0,
-  );
+  if (!view || !data) return;
+  const today = localDate();
+  const live = view.date === today && view.kind === "work";
+  const result = calculateWork(view, live ? currentTime() : null);
+  const target = dailyTarget(data.settings, view.date);
+  const credit = view.kind === "vacation" ? view.vacationCreditMinutes ?? 0 : 0;
+  const balance = result.worked + credit - target;
+  $("#workedDisplay").textContent = formatDuration(result.worked);
+  $("#targetDisplay").textContent = view.date ? formatDuration(target) : "—";
+  $("#balanceDisplay").textContent = view.date ? formatDuration(balance, true) : "—";
+  $("#balanceLabel").textContent = balance > 0 ? "Überzeit" : balance < 0 ? "Minuszeit" : "Saldo";
+  $("#balanceCard").className = `balance ${balance > 0 ? "positive" : balance < 0 ? "negative" : "neutral"}`;
+  $("#dayLabel").textContent = !view.date ? "DATUM ZUORDNEN" : view.date === today ? "HEUTE" : formatDate(view.date, { weekday: "long" });
+  $("#migrationHint").hidden = view.date !== null;
+  $("#vacationNote").hidden = view.kind !== "vacation";
+  $("#vacationNote").textContent = `Feriengutschrift: ${formatDuration(credit)} Std. (für diesen Tag gespeichert)`;
+  $("#timeFields").disabled = busy || view.kind !== "work";
+  $("#setEndNow").disabled = busy || !live;
+  let message = "Erfassung automatisch lokal gesichert. History-Speicherung beim Datumswechsel oder mit „Neuen Tag beginnen“.";
+  if (view.conflict) message = "Dieser gespeicherte Tag wurde inzwischen geändert oder gelöscht. Deine Erfassung bleibt hier erhalten; bitte vor dem Zurücksetzen bei Bedarf die Zeiten sichern.";
+  else if (!view.date) message = "Bitte den bisherigen Zeiten zuerst ein Datum zuordnen.";
+  else if (view.kind === "compensation") message = "Überzeitkompensation: keine Arbeitsstunden, reguläre Sollzeit bleibt bestehen.";
+  else if (view.kind === "vacation") message = "Es zählt ausschließlich die gespeicherte Feriengutschrift.";
+  else if (result.incompleteBreaks && live) message = "Unvollständige Pause: für die Statistik bitte beide Uhrzeiten ergänzen.";
+  else if (view.workStart && !view.workEnd) message = live ? "Live-Berechnung bis zur aktuellen Uhrzeit. Für die Statistik bitte Feierabend ergänzen." : "Unvollständig: Für historische Arbeitsstunden bitte Feierabend ergänzen.";
+  $("#message").textContent = message;
+}
 
-  if (startMinute !== null) {
-    const effectiveEnd = state.workEnd || currentTime();
-    let endMinute = timeToMinutes(effectiveEnd);
-    if (endMinute !== null && endMinute < startMinute) endMinute += 1440;
+function renderSettings() {
+  const hours = value => Number((value / 60).toFixed(4)).toLocaleString("de-CH", { maximumFractionDigits: 4, useGrouping: false });
+  if (document.activeElement !== $("#weeklyHours")) $("#weeklyHours").value = hours(weeklyTarget(data.settings, localDate()));
+  if (document.activeElement !== $("#vacationHours")) $("#vacationHours").value = hours(data.settings.vacationCreditMinutes);
+  for (const button of document.querySelectorAll("[data-theme-option]")) button.setAttribute("aria-pressed", String(button.dataset.themeOption === data.settings.theme));
+}
 
-    if (endMinute !== null) {
-      const pauseIntervals = [];
+function render() {
+  applyTheme(data.settings.theme);
+  $("#dayDate").value = view.date ?? "";
+  $("#workStart").value = view.workStart;
+  $("#workEnd").value = view.workEnd;
+  $("#vacationDay").checked = view.kind === "vacation";
+  $("#compensationDay").checked = view.kind === "compensation";
+  $("#breakList").replaceChildren();
+  view.breaks.forEach(pause => addBreakRow(pause));
+  renderSettings();
+  calculate();
+}
 
-      for (const pause of state.breaks) {
-        if (pause.duration) continue;
-        if (!pause.start) {
-          if (pause.end) incompleteBreaks += 1;
-          continue;
-        }
+for (const id of ["workStart", "workEnd"]) attachTimeInput($(`#${id}`));
+$("#dayDate").addEventListener("change", () => transition("selectDate", $("#dayDate").value));
+$("#resetDay").addEventListener("click", () => transition("newDay"));
+$("#discardDay").addEventListener("click", () => transition("resetDay"));
+$("#addBreak").addEventListener("click", () => { addBreakRow(undefined, true); edited(); });
+for (const button of document.querySelectorAll(".quick-break")) button.addEventListener("click", () => { addBreakRow({ duration: Number(button.dataset.duration) }, true); edited(); });
+$("#previousBreakPage").addEventListener("click", () => { breakPage--; updateBreakPagination(); });
+$("#nextBreakPage").addEventListener("click", () => { breakPage++; updateBreakPagination(); });
+for (const [id, other] of [["vacationDay", "compensationDay"], ["compensationDay", "vacationDay"]]) {
+  $(`#${id}`).addEventListener("change", () => { if ($(`#${id}`).checked) $(`#${other}`).checked = false; edited(); });
+}
+$("#setEndNow").addEventListener("click", () => {
+  if (busy || view.kind !== "work" || view.date !== localDate()) return;
+  const input = $("#workEnd");
+  input.value = currentTime();
+  input.removeAttribute("aria-invalid");
+  edited();
+});
+$("#openSettings").addEventListener("click", () => {
+  $("#mainView").hidden = true; $("#settingsView").hidden = false; renderSettings(); $("#weeklyHours").focus();
+});
+$("#closeSettings").addEventListener("click", () => { $("#settingsView").hidden = true; $("#mainView").hidden = false; $("#openSettings").focus(); });
 
-        const pauseStart = toTimelineMinute(pause.start, startMinute);
-        let pauseEnd;
-
-        if (pause.end) {
-          pauseEnd = toTimelineMinute(pause.end, startMinute);
-          if (pauseEnd < pauseStart) pauseEnd += 1440;
-        } else {
-          pauseEnd = endMinute;
-          incompleteBreaks += 1;
-        }
-
-        const clippedStart = Math.max(startMinute, pauseStart);
-        const clippedEnd = Math.min(endMinute, pauseEnd);
-        if (clippedEnd > clippedStart) pauseIntervals.push([clippedStart, clippedEnd]);
-      }
-
-      const pauseMinutes = mergeIntervals(pauseIntervals).reduce(
-        (total, [pauseStart, pauseEnd]) => total + pauseEnd - pauseStart,
-        0,
-      );
-      worked = Math.max(0, endMinute - startMinute - pauseMinutes - fixedPauseMinutes);
+function saveSettings(patch) {
+  clearErrors();
+  enqueue(async () => {
+    acceptExternal(await send({ type: "settings", patch }));
+    applyTheme(data.settings.theme);
+    for (const button of document.querySelectorAll("[data-theme-option]")) button.setAttribute("aria-pressed", String(button.dataset.themeOption === data.settings.theme));
+    calculate();
+  }).catch(() => {});
+}
+for (const [id, key, max] of [["weeklyHours", "weeklyTargetMinutes", 168], ["vacationHours", "vacationCreditMinutes", 24]]) {
+  $(`#${id}`).addEventListener("change", () => {
+    const input = $(`#${id}`), value = input.value.trim().replace(",", ".");
+    if (!/^\d+(\.\d{1,4})?$/.test(value) || Number(value) > max) {
+      input.setAttribute("aria-invalid", "true");
+      showError(new Error(`Bitte eine Stundenzahl zwischen 0 und ${max} eingeben, zum Beispiel 8,5.`));
+      return;
     }
-  }
-
-  const balance = worked - target;
-  elements.workedDisplay.textContent = formatDuration(worked);
-  elements.targetDisplay.textContent = formatDuration(target);
-  elements.balanceDisplay.textContent = formatDuration(balance, true);
-  elements.balanceLabel.textContent = balance > 0 ? "Überzeit" : balance < 0 ? "Minuszeit" : "Saldo";
-  elements.balanceCard.classList.toggle("positive", balance > 0);
-  elements.balanceCard.classList.toggle("negative", balance < 0);
-  elements.balanceCard.classList.toggle("neutral", balance === 0);
-
-
-  if (!state.workStart) {
-    elements.message.textContent = "Arbeitsbeginn eintragen oder „Start jetzt“ wählen.";
-  } else if (incompleteBreaks > 0) {
-    elements.message.textContent = "Eine offene Pause wird bis zur aktuellen Uhrzeit abgezogen.";
-  } else if (!state.workEnd) {
-    elements.message.textContent = "Live-Berechnung bis zur aktuellen Uhrzeit.";
-  } else {
-    elements.message.textContent = "Alle Werte sind lokal gespeichert.";
-  }
-}
-
-function applyTheme(theme) {
-  state.theme = theme === "dark" ? "dark" : "light";
-  document.documentElement.dataset.theme = state.theme;
-  elements.themeButtons.forEach((button) => {
-    button.setAttribute("aria-pressed", String(button.dataset.themeOption === state.theme));
+    input.removeAttribute("aria-invalid");
+    saveSettings({ [key]: Math.round(Number(value) * 60 * 10000) / 10000 });
   });
 }
-
-function openSettings() {
-  elements.mainView.hidden = true;
-  elements.settingsView.hidden = false;
-  elements.targetTime.focus();
-  elements.targetTime.select();
-}
-
-function closeSettings() {
-  elements.settingsView.hidden = true;
-  elements.mainView.hidden = false;
-  elements.openSettings.focus();
-}
-
-function addQuickBreak(duration) {
-  addFixedBreakRow(duration);
-  elements.message.textContent = `${duration} Minuten Pause wurden abgezogen.`;
-}
-
-async function loadState() {
-  const stored = await chrome.storage.local.get(STORAGE_KEY);
-  const saved = stored[STORAGE_KEY];
-
-  if (saved) {
-    state = {
-      targetTime: normalizeTime(saved.targetTime) || "08:00",
-      workStart: normalizeTime(saved.workStart) || "",
-      workEnd: normalizeTime(saved.workEnd) || "",
-      breaks: Array.isArray(saved.breaks) ? saved.breaks : [],
-      theme: saved.theme === "dark" ? "dark" : "light",
-    };
-  }
-
-  applyTheme(state.theme);
-  elements.targetTime.value = state.targetTime;
-  elements.workStart.value = state.workStart;
-  elements.workEnd.value = state.workEnd;
-  state.breaks.forEach((pause) => {
-    if (pause.duration) addFixedBreakRow(Number(pause.duration), false);
-    else addBreakRow(pause, false);
-  });
-  breakPage = 0;
-  updateBreakPagination();
-  calculate();
-}
-
-attachTimeInput(elements.targetTime);
-attachTimeInput(elements.workStart);
-attachTimeInput(elements.workEnd);
-
-elements.openSettings.addEventListener("click", openSettings);
-elements.closeSettings.addEventListener("click", closeSettings);
-elements.addBreak.addEventListener("click", () => addBreakRow(undefined, true, true));
-elements.previousBreakPage.addEventListener("click", () => {
-  breakPage -= 1;
-  updateBreakPagination();
-});
-elements.nextBreakPage.addEventListener("click", () => {
-  breakPage += 1;
-  updateBreakPagination();
-});
-elements.quickBreakButtons.forEach((button) => {
-  button.addEventListener("click", () => addQuickBreak(Number(button.dataset.duration)));
-});
-elements.themeButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    applyTheme(button.dataset.themeOption);
-    saveState();
-  });
+for (const button of document.querySelectorAll("[data-theme-option]")) button.addEventListener("click", () => saveSettings({ theme: button.dataset.themeOption }));
+$("#openHistory").addEventListener("click", () => {
+  if (busy) return;
+  const fields = capture(), capturedVersion = version;
+  setBusy(true);
+  enqueue(async () => { await persist(fields, capturedVersion); await openWindow("history.html"); }).catch(() => {}).finally(() => setBusy(false));
 });
 
-elements.setStartNow.addEventListener("click", () => {
-  elements.workStart.value = currentTime();
-  elements.workEnd.value = "";
-  saveState();
+onDataChanged(updated => {
+  if (!data) { external = updated; return; }
+  if (updated.revision <= data.revision) return;
+  if (pending) { external = updated; return; }
+  acceptExternal(updated);
 });
-
-elements.setEndNow.addEventListener("click", () => {
-  if (!getNormalizedInput(elements.workStart)) {
-    elements.message.textContent = "Bitte zuerst einen Arbeitsbeginn eintragen.";
-    elements.workStart.focus();
-    return;
-  }
-  elements.workEnd.value = currentTime();
-  saveState();
-});
-
-elements.resetDay.addEventListener("click", async () => {
-  const targetTime = state.targetTime || "08:00";
-  const theme = state.theme;
-  state = { targetTime, workStart: "", workEnd: "", breaks: [], theme };
-  elements.workStart.value = "";
-  elements.workEnd.value = "";
-  elements.breakList.replaceChildren();
-  breakPage = 0;
-  updateBreakPagination();
-  await chrome.storage.local.set({ [STORAGE_KEY]: state });
-  calculate();
-  elements.workStart.focus();
-});
-
-loadState();
-setInterval(() => {
-  collectStateFromForm();
-  calculate();
-}, 30_000);
+setBusy(true);
+send({ type: "read" }).then(result => {
+  data = external && external.revision > result.revision ? external : result;
+  external = null;
+  view = structuredClone(data.draft); render(); setBusy(false);
+}).catch(showError);
+setInterval(() => calculate(), 30_000);

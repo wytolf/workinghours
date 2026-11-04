@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>History · Arbeitszeit</title><link rel="stylesheet" href="popup.css" /></head>
+<body class="window-page">
+  <main>
+    <header><div><p class="eyebrow">GESPEICHERTE TAGE</p><h1>History</h1></div><button id="closeWindow" class="icon-button" type="button" aria-label="History schließen">×</button></header>
+    <section class="card calendar-card" aria-label="Gespeicherte Tage im Kalender">
+      <div class="calendar-heading"><button id="previousMonth" class="icon-button" type="button" aria-label="Vorheriger Monat">←</button><h2 id="monthLabel" aria-live="polite"></h2><button id="nextMonth" class="icon-button" type="button" aria-label="Nächster Monat">→</button></div>
+      <div class="calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+      <div id="calendarDays" class="calendar-days"></div>
+      <div class="calendar-legend"><span class="legend-work">Arbeit</span><span class="legend-vacation">Ferien</span><span class="legend-compensation">Kompensation</span></div>
+    </section>
+    <p id="historyHint" class="settings-note" role="status">Gespeicherte Tage auswählen, um Details zu öffnen.</p>
+    <p class="hint">Aktuelle Eingaben gelangen beim Datumswechsel oder mit „Neuen Tag beginnen“ in die History.</p>
+    <p id="error" class="error-message" role="alert" hidden></p>
+    <button id="openStatistics" class="primary full-width" type="button">Statistik öffnen</button>
+  </main>
+  <dialog id="dayDialog" aria-labelledby="detailDate">
+    <header><div><p id="detailKind" class="eyebrow"></p><h2 id="detailDate"></h2></div><button id="closeDetails" class="icon-button" type="button" aria-label="Tagesdetails schließen">×</button></header>
+    <div id="detailContent"></div>
+    <p id="detailError" class="error-message" role="alert" hidden></p>
+    <div id="deleteConfirmation" class="delete-confirmation" hidden><p>Diesen gespeicherten Tag endgültig löschen?</p><div class="dialog-actions"><button id="cancelDelete" class="secondary" type="button">Abbrechen</button><button id="confirmDelete" class="danger" type="button">Tag löschen</button></div></div>
+    <button id="deleteDay" class="ghost danger-text" type="button">Eintrag löschen</button>
+  </dialog>
+  <script type="module" src="history.js"></script>
+</body>
+</html>

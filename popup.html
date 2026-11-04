@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" class="toolbar-popup">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,13 +11,29 @@
       <section id="mainView">
         <header>
           <div>
-            <p class="eyebrow">HEUTE</p>
+            <p id="dayLabel" class="eyebrow">HEUTE</p>
             <h1>Arbeitszeit</h1>
           </div>
-          <button id="openSettings" class="icon-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
-            <span aria-hidden="true">⚙</span>
-          </button>
+          <div class="header-actions">
+            <button id="openHistory" class="secondary small" type="button">History</button>
+            <button id="openSettings" class="icon-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
+              <span aria-hidden="true">⚙</span>
+            </button>
+          </div>
         </header>
+
+        <div class="day-controls">
+          <div class="field">
+            <label for="dayDate">Datum</label>
+            <input id="dayDate" class="time-input" type="date" required />
+          </div>
+          <div class="day-types">
+            <label><input id="vacationDay" type="checkbox" /> Ferientag</label>
+            <label><input id="compensationDay" type="checkbox" /> Überzeitkompensation</label>
+          </div>
+        </div>
+        <p id="migrationHint" class="hint" hidden>Die bisherigen Zeiten haben noch kein Datum. Bitte einmalig zuordnen.</p>
+        <p id="vacationNote" class="credit-note" hidden></p>
 
         <section class="summary" aria-live="polite">
           <div><span>Gearbeitet</span><strong id="workedDisplay">0:00</strong></div>
@@ -27,7 +43,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <fieldset id="timeFields" class="card time-fields" aria-label="Arbeitszeiten und Pausen">
           <div class="time-grid">
             <div class="field">
               <label for="workStart">Arbeitsbeginn</label>
@@ -60,14 +76,15 @@
             <button id="nextBreakPage" class="pager-button" type="button" aria-label="Nächste Pausen">→</button>
           </div>
           <p id="emptyBreaks" class="empty">Noch keine Pause erfasst.</p>
-        </section>
+        </fieldset>
 
         <p id="message" class="message" role="status"></p>
+        <p id="error" class="error-message" role="alert" hidden></p>
 
         <footer>
-          <button id="setStartNow" class="secondary" type="button">Start jetzt</button>
           <button id="setEndNow" class="primary" type="button">Feierabend jetzt</button>
           <button id="resetDay" class="ghost" type="button">Neuen Tag beginnen</button>
+          <button id="discardDay" class="ghost" type="button">Tag zurücksetzen</button>
         </footer>
       </section>
 
@@ -81,9 +98,14 @@
 
         <section class="card settings-card">
           <div class="field">
-            <label for="targetTime">Tägliche Sollzeit</label>
-            <input id="targetTime" class="time-input" type="text" inputmode="numeric" maxlength="5" value="08:00" placeholder="HH:MM" autocomplete="off" />
-            <p class="hint">Zum Beispiel 800, 0800 oder 8:00</p>
+            <label for="weeklyHours">Wöchentliche Sollarbeitszeit (Stunden)</label>
+            <input id="weeklyHours" class="time-input" type="text" inputmode="decimal" autocomplete="off" />
+            <p class="hint">Gilt ab heute. Tagessoll: Wochenstunden ÷ 5, Montag bis Freitag.</p>
+          </div>
+          <div class="field">
+            <label for="vacationHours">Gutschrift pro Ferientag (Stunden)</label>
+            <input id="vacationHours" class="time-input" type="text" inputmode="decimal" autocomplete="off" />
+            <p class="hint">Standard: 8,5. Bereits markierte Ferientage behalten ihre Gutschrift.</p>
           </div>
 
           <fieldset>
@@ -100,6 +122,7 @@
         </section>
 
         <p class="settings-note">Änderungen werden automatisch gespeichert.</p>
+        <p id="settingsError" class="error-message" role="alert" hidden></p>
       </section>
     </main>
 
@@ -127,6 +150,6 @@
       </div>
     </template>
 
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

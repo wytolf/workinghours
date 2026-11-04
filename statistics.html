@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Statistik · Arbeitszeit</title><link rel="stylesheet" href="popup.css" /></head>
+<body class="window-page">
+  <main>
+    <header><div><p class="eyebrow">ARBEITSZEIT IM ÜBERBLICK</p><h1>Statistik</h1></div><button id="closeWindow" class="icon-button" type="button" aria-label="Statistik schließen">×</button></header>
+    <p id="period" class="period"></p>
+    <section id="emptyState" class="card empty-state" hidden><h2>Noch keine Auswertung möglich</h2><p>Die Statistik beginnt mit dem ersten gespeicherten Tag und reicht bis gestern. Heutige Einträge zählen ab morgen.</p></section>
+    <div id="statisticsContent" hidden>
+      <section class="summary statistics-grid" aria-label="Arbeitszeitstatistik" aria-live="polite">
+        <div><span>Tatsächlich gearbeitet</span><strong id="worked">0:00</strong><small>Stunden</small></div>
+        <div><span>Feriengutschrift</span><strong id="vacation">0:00</strong><small>Stunden</small></div>
+        <div><span>Sollstunden</span><strong id="target">0:00</strong><small>Stunden</small></div>
+        <div id="balanceCard" class="balance neutral"><span>Saldo inkl. Ferien</span><strong id="balance">0:00</strong><small>Stunden</small></div>
+        <div><span>Ø pro gearbeitetem Tag</span><strong id="average">—</strong><small>Stunden</small></div>
+        <div><span>Arbeits- / Ferientage</span><strong id="dayCounts">0 / 0</strong><small>Tage</small></div>
+      </section>
+      <section class="card quality-card" aria-label="Datenqualität"><div><h2>Datenqualität</h2><strong id="quality">—</strong></div><p id="qualityCount" class="hint"></p><p class="hint">Vollständige Tage im erfassten Zeitraum, unabhängig von erreichten Sollstunden. Maximal fünf Tage pro voller Woche; Ferien und Kompensation zählen mit.</p></section>
+      <p id="incompleteNote" class="hint" hidden></p>
+      <p class="settings-note">Auswertung bis gestern. Fehlende Werktage tragen Sollstunden bei. Kompensation reduziert den Saldo über die reguläre Sollzeit.</p>
+    </div>
+    <p id="error" class="error-message" role="alert" hidden></p>
+  </main>
+  <script type="module" src="statistics.js"></script>
+</body>
+</html>

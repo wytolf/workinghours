@@ -1,0 +1,13 @@
+{
+  "name": "workinghours-extension",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check popup.js && node --check background.js && node --check history.js && node --check statistics.js"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.14"
+  }
+}
