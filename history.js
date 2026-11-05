@@ -1,12 +1,14 @@
-import { formatDate, localDate, parseDate } from "./dates.js";
+import { createCalendar } from "./calendar.js";
+import { formatDate } from "./dates.js";
 import { canonicalDays, dailyTarget } from "./statistics-calculations.js";
 import { calculateWork, formatDuration } from "./time-calculations.js";
 import { applyTheme, onDataChanged, openWindow, send } from "./storage.js";
 
 const $ = selector => document.querySelector(selector);
 const kindLabels = { work: "Arbeitstag", vacation: "Ferientag", compensation: "Überzeitkompensation" };
-let data, month = localDate().slice(0, 7), selected = null, deleting = false;
+let data, selected = null, deleting = false;
 const dialog = $("#dayDialog");
+const calendar = createCalendar($("#historyCalendar"), { onSelect: (date, entry) => openDetails(entry) });
 
 function showError(error) {
   const target = dialog.open ? $("#detailError") : $("#error");
@@ -15,31 +17,9 @@ function showError(error) {
 
 function renderCalendar() {
   applyTheme(data.settings.theme);
-  const first = parseDate(`${month}-01`);
-  $("#monthLabel").textContent = first.toLocaleDateString("de-CH", { month: "long", year: "numeric" });
-  const offset = (first.getDay() + 6) % 7;
-  const last = new Date(first); last.setMonth(last.getMonth() + 1, 0);
-  const days = canonicalDays(data.history);
-  const focused = $("#calendarDays").contains(document.activeElement) ? document.activeElement.dataset.date : null;
-  $("#calendarDays").replaceChildren();
-  for (let index = 0; index < offset; index++) {
-    const spacer = document.createElement("span"); spacer.setAttribute("aria-hidden", "true"); $("#calendarDays").append(spacer);
-  }
-  for (let day = 1; day <= last.getDate(); day++) {
-    const date = `${month}-${String(day).padStart(2, "0")}`, entry = days.get(date);
-    const button = document.createElement("button");
-    button.type = "button"; button.dataset.date = date;
-    button.className = `calendar-day${entry ? ` has-entry ${entry.kind}` : ""}`;
-    button.textContent = day; button.disabled = !entry;
-    button.setAttribute("aria-label", `${formatDate(date)}${entry ? `, ${kindLabels[entry.kind]}, gespeichert` : ", kein Eintrag"}`);
-    if (date === localDate()) { button.classList.add("today"); button.setAttribute("aria-current", "date"); }
-    button.addEventListener("click", () => openDetails(entry));
-    $("#calendarDays").append(button);
-    if (focused === date) button.focus();
-  }
-  $("#previousMonth").disabled = month === "0001-01";
-  $("#nextMonth").disabled = month === "9999-12";
-  $("#historyHint").textContent = days.size ? "Markierte Tage auswählen, um Details zu öffnen." : "Noch keine Tage in der History gespeichert.";
+  calendar.update({ history: data.history });
+  $("#historyHint").hidden = canonicalDays(data.history).size > 0;
+  $("#historyHint").textContent = $("#historyHint").hidden ? "" : "Noch keine Tage in der History gespeichert.";
 }
 
 function detailRow(list, label, value) {
@@ -81,12 +61,6 @@ function openDetails(day) {
   if (!dialog.open) dialog.showModal();
 }
 
-function moveMonth(amount) {
-  const date = parseDate(`${month}-01`); date.setMonth(date.getMonth() + amount);
-  month = localDate(date).slice(0, 7); renderCalendar();
-}
-$("#previousMonth").addEventListener("click", () => moveMonth(-1));
-$("#nextMonth").addEventListener("click", () => moveMonth(1));
 $("#closeWindow").addEventListener("click", () => window.close());
 $("#closeDetails").addEventListener("click", () => dialog.close());
 dialog.addEventListener("close", () => { selected = null; });
@@ -100,6 +74,7 @@ $("#confirmDelete").addEventListener("click", async () => {
   try {
     data = await send({ type: "deleteDay", date: day.date, id: day.id, recordRevision: day.revision });
     dialog.close(); renderCalendar();
+    $("#historyHint").hidden = false;
     $("#historyHint").textContent = `Eintrag vom ${formatDate(day.date)} gelöscht.`; $("#previousMonth").focus();
   } catch (error) { showError(error); }
   finally { deleting = false; $("#confirmDelete").disabled = false; }

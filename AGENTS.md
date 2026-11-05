@@ -7,6 +7,7 @@
 - Fachliche Regeln stehen in `README.md` und `docs/history-statistics-plan.md`.
 
 ## Änderungen
+- Änderungen ausschließlich isoliert auf separaten Aufgaben-Branches durchführen, niemals direkt auf `main` oder `master`. Vor der ersten Änderung einen passenden Branch mit dem Präfix `codex/` anlegen oder auf den zu dieser Aufgabe gehörenden Branch wechseln; unabhängige Aufgaben nicht auf demselben Branch vermischen.
 - Änderungen klein halten und dem bestehenden Stil folgen.
 - Vorhandene Module für Datum, Zeitberechnung, Zustand und Speicherung nutzen.
 - Daten bleiben lokal im Browser. Speicheränderungen über den gemeinsamen Hintergrundprozess führen.

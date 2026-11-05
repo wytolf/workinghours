@@ -344,6 +344,18 @@ body.window-page { width: auto; min-width: 320px; }
 .calendar-day.compensation::after { background: #a26a1a; }
 .calendar-day.has-entry:hover { border-color: var(--primary); background: var(--focus); }
 .calendar-day.today { outline: 1px solid var(--primary); outline-offset: -1px; }
+.calendar-day.selected { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); color: var(--primary); font-weight: 800; }
+.date-picker-button { display: flex; align-items: center; justify-content: space-between; text-align: left; font-size: 13px; font-weight: 600; }
+.date-picker-button::after { content: "▾"; color: var(--text-muted); margin-left: 6px; }
+.date-dialog { width: calc(100% - 24px); max-width: 306px; padding: 10px; border-radius: 12px; }
+.date-dialog .calendar-heading { gap: 6px; margin-bottom: 8px; }
+.date-dialog .calendar-heading h2 { font-size: 14px; }
+.date-dialog .calendar-heading .icon-button { width: 30px; min-height: 30px; border-radius: 8px; font-size: 16px; }
+.date-dialog .calendar-weekdays, .date-dialog .calendar-days { gap: 3px; }
+.date-dialog .calendar-weekdays { margin-bottom: 6px; }
+.date-dialog .calendar-day { min-height: 28px; padding: 2px 0 7px; border-radius: 7px; line-height: 16px; }
+.date-dialog .calendar-day.has-entry::after { bottom: 3px; width: 4px; height: 4px; left: calc(50% - 2px); }
+.date-dialog .calendar-legend { gap: 8px; margin-top: 8px; }
 .calendar-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; color: var(--text-muted); font-size: 10px; }
 .calendar-legend span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); margin-right: 4px; }
 .calendar-legend .legend-vacation::before { background: #278456; }

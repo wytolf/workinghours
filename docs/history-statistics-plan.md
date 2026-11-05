@@ -270,8 +270,12 @@ Beispiele:
 
 ### Hauptansicht und Einstellungen
 
-- Datumsfeld in der Hauptansicht; die bisherige feste Überschrift „HEUTE“ passt
-  sich dem gewählten Datum an.
+- Datumsauswahl in der Hauptansicht über das gemeinsame Kalendermodul aus der
+  History: Monatsnavigation, Markierungen gespeicherter Arbeits-, Ferien- und
+  Kompensationstage sowie Hervorhebung des ausgewählten Tages. Auch leere Tage
+  sind hier auswählbar. Erst die Tagesauswahl löst den bisherigen Speicher- und
+  Ladeablauf aus; Blättern und Schließen verändern keine Daten. Die Überschrift
+  „HEUTE“ passt sich dem gewählten Datum an.
 - Checkbox „Ferientag“ und Checkbox „Überzeitkompensation“, die sich gegenseitig
   ausschalten. Ohne Markierung gilt Arbeitstag. Zeitfelder und Zeitaktionen sind
   bei einer Markierung deaktiviert; vorhandene Werte bleiben erhalten.

@@ -26,6 +26,17 @@ ein anderes Datum oder mit **Neuen Tag beginnen**. Beim Datumswechsel wird zuers
 der bisherige Tag gespeichert und anschließend der gewählte Tag geladen. Das
 Datumsfeld benennt keinen bestehenden Datensatz um.
 
+Ein Klick auf das Datum öffnet denselben Kalender wie in der History. Gespeicherte
+Tage sind nach Arbeit, Ferien und Kompensation markiert; der ausgewählte Tag ist
+zusätzlich hervorgehoben. In der Hauptansicht lassen sich auch leere Tage wählen.
+Die Monatsnavigation und das Schließen des Kalenders ändern die Erfassung nicht.
+Markierungen zeigen gespeicherte History-Einträge, keine noch offenen Entwürfe.
+Der Kalenderdialog verwendet eine kompakte Monatsansicht mit schmalen Abständen
+und zeigt keine zusätzliche Überschrift und keinen Bedienhinweis.
+Er schließt durch einen Klick außerhalb des Dialogs oder mit Escape und benötigt
+keinen Schließen-Button. Klicks innerhalb des Kalenders schließen ihn nur bei
+erfolgreicher Tagesauswahl.
+
 - **Neuen Tag beginnen:** Angezeigten Tag speichern, dann leere Erfassung für heute.
 - **Tag zurücksetzen:** Aktuelle Erfassung ohne History-Speicherung verwerfen, dann
   leere Erfassung für heute. Bereits gespeicherte Einträge bleiben erhalten.
@@ -44,6 +55,7 @@ in der History entfernt alle Einträge dieses Datums.
 History und Statistik öffnen sich als eigene kleine Browserfenster im bestehenden
 Design. Dabei schließt Chromium das Toolbar-Popup; der Entwurf wird vorher
 gesichert. Die History bietet ausschließlich Ansicht und Löschen, keine Bearbeitung.
+Unter dem Kalender erscheinen nur Leerzustands- und Löschmeldungen, keine Bedienhinweise.
 Das Datum ist nur in der Hauptansicht bearbeitbar. Ein geöffneter Entwurf wechselt
 auch um Mitternacht nicht automatisch auf ein anderes Datum.
 
@@ -167,7 +179,7 @@ npm run check
 
 Die Tests prüfen Berechnungen, Migration, Speicherübergänge und Bedienabläufe mit
 simuliertem Browser-Speicher. Die DOM-Prüfungen ersetzen keine visuelle Kontrolle
-von Layout, nativen Datumsfeldern und Popup-Verhalten im echten Chromium.
+von Layout, Kalenderdialog und Popup-Verhalten im echten Chromium.
 
 Der freigegebene Umfang und die Akzeptanzkriterien stehen in
 [docs/history-statistics-plan.md](docs/history-statistics-plan.md).

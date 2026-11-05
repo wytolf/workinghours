@@ -5,7 +5,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "test": "node --test",
-    "check": "node --check popup.js && node --check background.js && node --check history.js && node --check statistics.js && node --check history-backup.js"
+    "check": "node --check popup.js && node --check background.js && node --check history.js && node --check statistics.js && node --check history-backup.js && node --check calendar.js"
   },
   "devDependencies": {
     "linkedom": "0.18.14"
