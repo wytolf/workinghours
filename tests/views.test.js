@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { setTimeout as pause } from "node:timers/promises";
 import { parseHTML } from "linkedom";
-import { localDate, shiftDate } from "../dates.js";
+import { formatDate, localDate, shiftDate } from "../dates.js";
 import { draftFor, emptyDay, migrate, STORAGE_KEY } from "../state.js";
 
 let stored = {}, listeners = new Set(), opened = [], failWrite = false, scriptId = 0;
@@ -61,6 +61,18 @@ async function flush() { await pause(15); }
 function event(element, type) { element.dispatchEvent(new window.Event(type, { bubbles: true })); }
 function enter(selector, value, type = "input") { const element = document.querySelector(selector); element.value = value; event(element, type); }
 function click(selector) { event(document.querySelector(selector), "click"); }
+function browseTo(date) {
+  const targetMonth = date.slice(0, 7);
+  while (document.querySelector(".calendar-card").dataset.month !== targetMonth) {
+    const month = document.querySelector(".calendar-card").dataset.month;
+    click(month < targetMonth ? "#nextMonth" : "#previousMonth");
+  }
+}
+function chooseDate(date) {
+  if (!document.querySelector("#dateDialog").open) click("#dayDate");
+  browseTo(date);
+  click(`button[data-date="${date}"]`);
+}
 function check(selector, value = true) { document.querySelector(selector).checked = value; event(document.querySelector(selector), "change"); }
 
 test("manual end entry persists without an end now action", async () => {
@@ -80,6 +92,124 @@ test("manual end entry persists without an end now action", async () => {
   assert.equal(document.querySelector("#error").hidden, true);
 });
 
+test("main date picker marks saved day types and highlights the selected date", async () => {
+  const initial = migrate(null, today), month = today.slice(0, 7);
+  initial.history = [day(`${month}-01`), day(`${month}-02`, { kind: "vacation", vacationCreditMinutes: 510 }),
+    day(`${month}-03`, { kind: "compensation" }), day(`${month}-01`, { kind: "vacation", vacationCreditMinutes: 480 })];
+  await mount("popup", initial);
+  assert.equal(document.querySelector('input[type="date"]'), null);
+  click("#dayDate");
+  assert.equal(document.querySelector("#dateDialog").open, true);
+  assert.equal(document.querySelector("#dateDialog").getAttribute("aria-label"), "Datum wählen");
+  assert.equal(document.querySelectorAll(".has-entry").length, 3);
+  for (const [number, kind] of [["01", "work"], ["02", "vacation"], ["03", "compensation"]]) {
+    const button = document.querySelector(`button[data-date="${month}-${number}"]`);
+    assert.ok(button.classList.contains(kind));
+    assert.match(button.getAttribute("aria-label"), /gespeichert/);
+    assert.equal(button.disabled, false);
+  }
+  assert.equal(document.querySelector(".selected").dataset.date, today);
+  assert.equal(document.querySelector(".selected").getAttribute("aria-pressed"), "true");
+  assert.equal(document.querySelector(".today").getAttribute("aria-current"), "date");
+  assert.equal(document.activeElement.dataset.date, today);
+  assert.equal(document.querySelector(`button[data-date="${month}-04"]`).disabled, false);
+});
+
+test("browsing and closing the main calendar leave the draft and history unchanged", async () => {
+  await mount("popup"); enter("#workStart", "800"); await flush();
+  const before = structuredClone(stored[STORAGE_KEY]);
+  click("#dayDate");
+  const nextMonth = shiftDate(`${today.slice(0, 7)}-01`, 32).slice(0, 7);
+  click("#nextMonth");
+  assert.equal(document.querySelector("#dateCalendar").dataset.month, nextMonth);
+  const dialog = document.querySelector("#dateDialog");
+  dialog.getBoundingClientRect = () => ({ left: 20, right: 360, top: 20, bottom: 400 });
+  const insideClick = new window.Event("click", { bubbles: true });
+  Object.assign(insideClick, { clientX: 25, clientY: 25 });
+  dialog.dispatchEvent(insideClick);
+  assert.equal(dialog.open, true, "Clicking the dialog padding must keep the calendar open");
+  click("#monthLabel");
+  assert.equal(dialog.open, true, "Clicking calendar content must keep the calendar open");
+  const outsideClick = new window.Event("click", { bubbles: true });
+  Object.assign(outsideClick, { clientX: 10, clientY: 200 });
+  dialog.dispatchEvent(outsideClick); await flush();
+  assert.equal(document.querySelector("#dateDialog").open, false);
+  assert.equal(document.activeElement.id, "dayDate");
+  assert.deepEqual(stored[STORAGE_KEY], before);
+  click("#dayDate");
+  assert.equal(document.querySelector("#dateCalendar").dataset.month, today.slice(0, 7));
+});
+
+test("calendar selection across months saves the old date and loads an existing entry", async () => {
+  const initial = migrate(null, today), savedDate = shiftDate(today, -40), futureDate = shiftDate(today, 40);
+  initial.history = [day(savedDate, { workStart: "09:00", workEnd: "18:00" })];
+  await mount("popup", initial);
+  enter("#workStart", "800"); enter("#workEnd", "1600");
+  chooseDate(savedDate); await flush();
+  assert.equal(document.querySelector("#dateDialog").open, false);
+  assert.equal(document.querySelector("#dayDate").textContent, formatDate(savedDate));
+  assert.equal(document.querySelector("#workStart").value, "09:00");
+  assert.equal(document.querySelector("#workEnd").value, "18:00");
+  assert.equal(stored[STORAGE_KEY].history.find(entry => entry.date === today).workEnd, "16:00");
+  chooseDate(futureDate); await flush();
+  assert.equal(stored[STORAGE_KEY].draft.date, futureDate);
+  assert.equal(document.querySelector("#workStart").value, "");
+  assert.equal(document.querySelector("#dateDialog").open, false);
+  click("#dayDate"); browseTo(today);
+  assert.ok(document.querySelector(`button[data-date="${today}"]`).classList.contains("has-entry"));
+});
+
+test("an open main calendar refreshes deleted markers without losing its displayed month", async () => {
+  const initial = migrate(null, today), savedDate = shiftDate(today, -40);
+  initial.history = [day(savedDate)];
+  await mount("popup", initial);
+  click("#dayDate"); browseTo(savedDate);
+  const selector = `button[data-date="${savedDate}"]`;
+  document.querySelector(selector).focus();
+  assert.ok(document.querySelector(selector).classList.contains("has-entry"));
+  await enqueue({ type: "deleteDay", date: savedDate, id: initial.history[0].id, recordRevision: 1 }); await flush();
+  assert.equal(document.querySelector("#dateCalendar").dataset.month, savedDate.slice(0, 7));
+  assert.equal(document.querySelector(selector).classList.contains("has-entry"), false);
+  assert.equal(document.querySelector(selector).disabled, false);
+  assert.equal(document.activeElement.dataset.date, savedDate);
+  assert.equal(document.querySelector("#dateDialog").open, true);
+});
+
+test("legacy calendar assignment rejects an occupied date and retains the existing times", async () => {
+  const initial = migrate({ workStart: "08:00", workEnd: "16:00", breaks: [] }, today);
+  initial.history = [day(today)];
+  await mount("popup", initial);
+  chooseDate(today); await flush();
+  assert.equal(document.querySelector("#dateDialog").open, true);
+  assert.match(document.querySelector("#dateError").textContent, /existiert bereits ein Eintrag/);
+  assert.equal(stored[STORAGE_KEY].draft.date, null);
+  assert.equal(document.querySelector("#workEnd").value, "16:00");
+  chooseDate(yesterday); await flush();
+  assert.equal(stored[STORAGE_KEY].draft.date, yesterday);
+  assert.equal(document.querySelector("#dateDialog").open, false);
+  assert.equal(document.querySelector("#workEnd").value, "16:00");
+});
+
+test("shared calendar handles leap days, Monday offsets and supported date boundaries", async () => {
+  const initial = migrate(null, today); initial.draft = draftFor("2024-02-29", []);
+  await mount("popup", initial); click("#dayDate");
+  assert.equal(document.querySelectorAll(".calendar-day").length, 29);
+  assert.equal(document.querySelectorAll('#calendarDays > span[aria-hidden="true"]').length, 3);
+  assert.equal(document.querySelector(".selected").textContent, "29");
+  click("#nextMonth");
+  assert.equal(document.querySelectorAll(".calendar-day").length, 31);
+  click("#previousMonth");
+  assert.equal(document.querySelector(".selected").dataset.date, "2024-02-29");
+  for (const [date, boundary, other] of [["0001-01-01", "previousMonth", "nextMonth"], ["9999-12-31", "nextMonth", "previousMonth"]]) {
+    initial.draft = draftFor(date, []);
+    await mount("popup", initial); click("#dayDate");
+    assert.equal(document.querySelector(`#${boundary}`).disabled, true);
+    assert.equal(document.querySelector(`#${other}`).disabled, false);
+    click(`#${boundary}`);
+    assert.equal(document.querySelector("#dateCalendar").dataset.month, date.slice(0, 7));
+  }
+});
+
 test("main view persists fast input, hidden pause pages and date navigation under the old date", async () => {
   await mount("popup");
   enter("#workStart", "800"); event(document.querySelector("#workStart"), "blur");
@@ -87,14 +217,14 @@ test("main view persists fast input, hidden pause pages and date navigation unde
   click("#addBreak30"); click("#addBreak60"); click("#addBreak");
   assert.equal(document.querySelector("#breakPageLabel").textContent, "2 / 2");
   await flush();
-  enter("#dayDate", yesterday, "change"); await flush();
+  chooseDate(yesterday); await flush();
   const data = stored[STORAGE_KEY];
   assert.equal(data.history.length, 1);
   assert.equal(data.history[0].date, today);
   assert.equal(data.history[0].workStart, "08:00");
   assert.deepEqual(data.history[0].breaks, [{ duration: 30 }, { duration: 60 }, { start: "", end: "" }]);
   assert.equal(document.querySelector("#workStart").value, "");
-  enter("#dayDate", today, "change"); await flush();
+  chooseDate(today); await flush();
   assert.equal(document.querySelector("#workEnd").value, "17:00");
   assert.equal(document.querySelector("#error").hidden, true);
 });
@@ -105,7 +235,7 @@ test("main reset and a subsequent date change leave today's archived entry intac
   enter("#workEnd", "1800"); click("#discardDay"); await flush();
   assert.equal(document.querySelector("#workStart").value, "");
   assert.equal(stored[STORAGE_KEY].history[0].workEnd, "16:00");
-  enter("#dayDate", yesterday, "change"); await flush();
+  chooseDate(yesterday); await flush();
   assert.equal(stored[STORAGE_KEY].history[0].workEnd, "16:00");
 });
 
@@ -161,20 +291,22 @@ test("a pending settings response does not replace text currently being edited",
 
 test("invalid times block navigation, show an error and retain the edited form", async () => {
   await mount("popup"); enter("#workStart", "29:00"); await flush();
-  enter("#dayDate", yesterday, "change"); await flush();
-  assert.equal(document.querySelector("#dayDate").value, today);
+  chooseDate(yesterday); await flush();
+  assert.equal(document.querySelector("#dayDate").textContent, formatDate(today));
   assert.equal(document.querySelector("#workStart").value, "29:00");
-  assert.equal(document.querySelector("#error").hidden, false);
+  assert.equal(document.querySelector("#dateError").hidden, false);
+  assert.equal(document.querySelector("#dateDialog").open, true);
   assert.equal(stored[STORAGE_KEY].history.length, 0);
 });
 
 test("a failed save cannot archive an old form or clear the current inputs", async () => {
   await mount("popup"); enter("#workStart", "800"); await flush();
-  failWrite = true; enter("#dayDate", yesterday, "change"); await flush();
-  assert.equal(document.querySelector("#dayDate").value, today);
+  failWrite = true; chooseDate(yesterday); await flush();
+  assert.equal(document.querySelector("#dayDate").textContent, formatDate(today));
   assert.equal(document.querySelector("#workStart").value, "8:00");
   assert.equal(stored[STORAGE_KEY].history.length, 0);
-  assert.match(document.querySelector("#error").textContent, /Speicher voll/);
+  assert.match(document.querySelector("#dateError").textContent, /Speicher voll/);
+  assert.equal(document.querySelector("#dateDialog").open, true);
 });
 
 test("a concurrent draft change preserves rejected local input until explicit reset", async () => {
@@ -206,13 +338,15 @@ test("deletion in the history cannot be undone by an unchanged open main view", 
   await mount("popup", initial);
   await enqueue({ type: "deleteDay", date: today, id: initial.history[0].id, recordRevision: 1 });
   await flush();
-  enter("#dayDate", yesterday, "change"); await flush();
+  chooseDate(yesterday); await flush();
   assert.equal(stored[STORAGE_KEY].history.length, 0);
   assert.equal(document.querySelector("#error").hidden, true);
 });
 
 test("theme changes propagate to an already open history", async () => {
   await mount("history");
+  assert.equal(document.querySelector("#historyHint").hidden, false);
+  assert.equal(document.querySelector("#historyHint").textContent, "Noch keine Tage in der History gespeichert.");
   await enqueue({ type: "settings", patch: { theme: "dark" } }); await flush();
   assert.equal(document.documentElement.dataset.theme, "dark");
 });
@@ -221,7 +355,7 @@ test("legacy date assignment keeps existing times and is not a normal date switc
   const initial = migrate({ workStart: "08:00", workEnd: "16:00", breaks: [] }, today);
   await mount("popup", initial);
   assert.equal(document.querySelector("#migrationHint").hidden, false);
-  enter("#dayDate", yesterday, "change"); await flush();
+  chooseDate(yesterday); await flush();
   assert.equal(document.querySelector("#workStart").value, "08:00");
   assert.equal(stored[STORAGE_KEY].history.length, 0);
   click("#resetDay"); await flush();
@@ -231,6 +365,8 @@ test("legacy date assignment keeps existing times and is not a normal date switc
 test("calendar marks saved dates, opens read-only details and deletes the selected date", async () => {
   const initial = migrate(null, today); initial.history = [day(today, { kind: "vacation", vacationCreditMinutes: 510 })];
   await mount("history", initial);
+  assert.equal(document.querySelector("#historyHint").hidden, true);
+  assert.doesNotMatch(document.querySelector("main").textContent, /Tage auswählen|Aktuelle Eingaben gelangen/);
   assert.equal(document.querySelectorAll(".has-entry").length, 1);
   assert.equal(document.querySelectorAll('input[type="date"]').length, 0);
   click(`button[data-date="${today}"]`);
@@ -241,6 +377,8 @@ test("calendar marks saved dates, opens read-only details and deletes the select
   assert.equal(stored[STORAGE_KEY].history.length, 0);
   assert.equal(document.querySelector("#dayDialog").open, false);
   assert.equal(document.querySelectorAll(".has-entry").length, 0);
+  assert.equal(document.querySelector("#historyHint").hidden, false);
+  assert.equal(document.querySelector("#historyHint").textContent, `Eintrag vom ${formatDate(today)} gelöscht.`);
 });
 
 test("statistics show yesterday, separate vacation hours and use the common cutoff", async () => {

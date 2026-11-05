@@ -25,7 +25,7 @@
         <div class="day-controls">
           <div class="field">
             <label for="dayDate">Datum</label>
-            <input id="dayDate" class="time-input" type="date" required />
+            <button id="dayDate" class="time-input date-picker-button" type="button" aria-haspopup="dialog" aria-controls="dateDialog">Datum wählen</button>
           </div>
           <div class="day-types">
             <label><input id="vacationDay" type="checkbox" /> Ferientag</label>
@@ -124,6 +124,11 @@
         <p id="settingsError" class="error-message" role="alert" hidden></p>
       </section>
     </main>
+
+    <dialog id="dateDialog" class="date-dialog" aria-label="Datum wählen">
+      <div id="dateCalendar" class="calendar-card"></div>
+      <p id="dateError" class="error-message" role="alert" hidden></p>
+    </dialog>
 
     <template id="breakTemplate">
       <div class="break-row">

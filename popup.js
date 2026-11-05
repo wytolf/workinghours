@@ -1,3 +1,4 @@
+import { createCalendar } from "./calendar.js";
 import { formatDate, localDate } from "./dates.js";
 import { dailyTarget, weeklyTarget } from "./statistics-calculations.js";
 import { calculateWork, currentTime, formatDuration, formatTimeWhileTyping, normalizeTime } from "./time-calculations.js";
@@ -8,9 +9,11 @@ let data, view, queue = Promise.resolve(), pending = 0, external = null, version
 let unsaved = false, stale = false;
 let breakPage = 0, breakCounter = 0;
 const BREAKS_PER_PAGE = 2;
+const dateDialog = $("#dateDialog");
+const calendar = createCalendar($("#dateCalendar"), { selectEmpty: true, onSelect: date => transition("selectDate", date) });
 
 function showError(error) {
-  const target = $("#settingsView").hidden ? $("#error") : $("#settingsError");
+  const target = dateDialog.open ? $("#dateError") : $("#settingsView").hidden ? $("#error") : $("#settingsError");
   target.textContent = error.message;
   target.hidden = false;
 }
@@ -18,11 +21,13 @@ function showError(error) {
 function clearErrors() {
   $("#error").hidden = true;
   $("#settingsError").hidden = true;
+  $("#dateError").hidden = true;
 }
 
 function acceptExternal(updated) {
   const draftChanged = updated.draftRevision !== data.draftRevision;
   data = updated;
+  renderDatePicker();
   if (unsaved && draftChanged) {
     stale = true;
     applyTheme(data.settings.theme);
@@ -93,6 +98,7 @@ function setBusy(value) {
     $("#timeFields").disabled = view.kind !== "work";
     updateBreakPagination();
   }
+  if (data) renderDatePicker();
 }
 
 function transition(type, date) {
@@ -109,9 +115,12 @@ function transition(type, date) {
     view = structuredClone(data.draft);
     breakPage = 0;
     render();
-  }).catch(() => { $("#dayDate").value = view.date ?? ""; }).finally(() => {
+    if (dateDialog.open) dateDialog.close();
+  }).catch(() => { renderDatePicker(); }).finally(() => {
     setBusy(false);
     if (type !== "selectDate") $("#workStart").focus();
+    else if (!dateDialog.open) $("#dayDate").focus();
+    else calendar.focusDate(date);
   });
 }
 
@@ -206,9 +215,15 @@ function renderSettings() {
   for (const button of document.querySelectorAll("[data-theme-option]")) button.setAttribute("aria-pressed", String(button.dataset.themeOption === data.settings.theme));
 }
 
+function renderDatePicker() {
+  $("#dayDate").textContent = view.date ? formatDate(view.date) : "Datum wählen";
+  $("#dayDate").setAttribute("aria-label", view.date ? `Datum wählen, ${formatDate(view.date)}` : "Datum wählen");
+  if (dateDialog.open) calendar.update({ history: data.history, selectedDate: view.date, disabled: busy });
+}
+
 function render() {
   applyTheme(data.settings.theme);
-  $("#dayDate").value = view.date ?? "";
+  renderDatePicker();
   $("#workStart").value = view.workStart;
   $("#workEnd").value = view.workEnd;
   $("#vacationDay").checked = view.kind === "vacation";
@@ -220,7 +235,20 @@ function render() {
 }
 
 for (const id of ["workStart", "workEnd"]) attachTimeInput($(`#${id}`));
-$("#dayDate").addEventListener("change", () => transition("selectDate", $("#dayDate").value));
+$("#dayDate").addEventListener("click", () => {
+  if (busy) return;
+  $("#dateError").hidden = true;
+  const date = view.date ?? localDate();
+  calendar.update({ history: data.history, selectedDate: view.date, month: date.slice(0, 7), disabled: false });
+  dateDialog.showModal();
+  calendar.focusDate(date);
+});
+dateDialog.addEventListener("click", event => {
+  if (event.target !== dateDialog) return;
+  const bounds = dateDialog.getBoundingClientRect();
+  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dateDialog.close();
+});
+dateDialog.addEventListener("close", () => $("#dayDate").focus());
 $("#resetDay").addEventListener("click", () => transition("newDay"));
 $("#discardDay").addEventListener("click", () => transition("resetDay"));
 $("#addBreak").addEventListener("click", () => { addBreakRow(undefined, true); edited(); });
