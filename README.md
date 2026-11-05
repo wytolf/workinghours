@@ -5,7 +5,7 @@ Ferien, Überzeitkompensation und Statistiken. Alle Daten bleiben im Browser.
 
 ## Funktionen
 
-- Arbeitsbeginn manuell setzen, Feierabend manuell oder mit „Feierabend jetzt“
+- Arbeitsbeginn und Feierabend manuell setzen
 - Zeiteingabe ohne Doppelpunkt: `800`, `0800` und `8:00` werden zu `08:00`
 - Beliebig viele Pausen hinzufügen und entfernen; kompakte Seitennavigation ohne Scrollen
 - Schnellbuttons für einen festen Abzug von 30 oder 60 Minuten Pause
@@ -51,9 +51,7 @@ auch um Mitternacht nicht automatisch auf ein anderes Datum.
 **Arbeitstag**, **Ferientag** und **Überzeitkompensation** schließen sich aus.
 Bei Ferien oder Kompensation bleiben vorhandene Arbeitszeiten und Pausen erhalten,
 sind aber deaktiviert und werden nicht angerechnet. Nach Entfernen der Markierung
-sind sie wieder nutzbar. „Feierabend jetzt“ steht für heutige Arbeitstage zur
-Verfügung und setzt die aktuelle Uhrzeit auch ohne bereits erfassten Arbeitsbeginn.
-Der Beginn kann anschließend ergänzt werden; andere Tage lassen sich manuell erfassen.
+sind sie wieder nutzbar. Arbeitsbeginn und Feierabend werden manuell erfasst.
 
 - **Ferientag:** Beim Markieren wird die aktuelle Feriengutschrift im Tag gespeichert
   (Standard 8,5 Stunden). Änderungen der Einstellung gelten nur für anschließend neu

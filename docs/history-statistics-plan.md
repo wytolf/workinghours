@@ -277,8 +277,9 @@ Beispiele:
   bei einer Markierung deaktiviert; vorhandene Werte bleiben erhalten.
 - Bestehende Anzeige für gearbeitet, Soll und Saldo beibehalten. Feriengutschrift
   erscheint zusätzlich bei markierten Ferientagen, statt als Arbeitszeit zu gelten.
-- Button „History“ ergänzen. Im Footer stehen weiterhin Start/Feierabend sowie
-  „Neuen Tag beginnen“ und neu „Tag zurücksetzen“ als getrennte Aktionen.
+- Button „History“ ergänzen. Im Footer stehen „Neuen Tag beginnen“ und
+  „Tag zurücksetzen“ als getrennte Aktionen. Beginn und Feierabend werden manuell
+  erfasst; die Aktion „Feierabend jetzt“ entfällt.
 - Einstellungen: Wochenstunden, Feriengutschrift in Stunden, Darstellung.
   Automatische Speicherung beibehalten. Das aktuelle Wochensoll und eine Änderung
   gelten ab heute; keine rückwirkende Datumsauswahl in den Einstellungen.

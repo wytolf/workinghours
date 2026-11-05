@@ -91,8 +91,6 @@ function setBusy(value) {
   for (const element of document.querySelectorAll("button, input")) element.disabled = value;
   if (!value) {
     $("#timeFields").disabled = view.kind !== "work";
-    const liveAllowed = view.kind === "work" && view.date === localDate();
-    $("#setEndNow").disabled = !liveAllowed;
     updateBreakPagination();
   }
 }
@@ -191,7 +189,6 @@ function calculate() {
   $("#vacationNote").hidden = view.kind !== "vacation";
   $("#vacationNote").textContent = `Feriengutschrift: ${formatDuration(credit)} Std. (für diesen Tag gespeichert)`;
   $("#timeFields").disabled = busy || view.kind !== "work";
-  $("#setEndNow").disabled = busy || !live;
   let message = "Erfassung automatisch lokal gesichert. History-Speicherung beim Datumswechsel oder mit „Neuen Tag beginnen“.";
   if (view.conflict) message = "Dieser gespeicherte Tag wurde inzwischen geändert oder gelöscht. Deine Erfassung bleibt hier erhalten; bitte vor dem Zurücksetzen bei Bedarf die Zeiten sichern.";
   else if (!view.date) message = "Bitte den bisherigen Zeiten zuerst ein Datum zuordnen.";
@@ -233,13 +230,6 @@ $("#nextBreakPage").addEventListener("click", () => { breakPage++; updateBreakPa
 for (const [id, other] of [["vacationDay", "compensationDay"], ["compensationDay", "vacationDay"]]) {
   $(`#${id}`).addEventListener("change", () => { if ($(`#${id}`).checked) $(`#${other}`).checked = false; edited(); });
 }
-$("#setEndNow").addEventListener("click", () => {
-  if (busy || view.kind !== "work" || view.date !== localDate()) return;
-  const input = $("#workEnd");
-  input.value = currentTime();
-  input.removeAttribute("aria-invalid");
-  edited();
-});
 $("#openSettings").addEventListener("click", () => {
   $("#mainView").hidden = true; $("#settingsView").hidden = false; renderSettings(); $("#weeklyHours").focus();
 });

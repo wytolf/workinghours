@@ -5,7 +5,6 @@ import { setTimeout as pause } from "node:timers/promises";
 import { parseHTML } from "linkedom";
 import { localDate, shiftDate } from "../dates.js";
 import { draftFor, emptyDay, migrate, STORAGE_KEY } from "../state.js";
-import { currentTime } from "../time-calculations.js";
 
 let stored = {}, listeners = new Set(), opened = [], failWrite = false, scriptId = 0;
 const today = localDate(), yesterday = shiftDate(today, -1);
@@ -64,69 +63,21 @@ function enter(selector, value, type = "input") { const element = document.query
 function click(selector) { event(document.querySelector(selector), "click"); }
 function check(selector, value = true) { document.querySelector(selector).checked = value; event(document.querySelector(selector), "change"); }
 
-test("end now fills and persists the current time after a manually entered start", async () => {
+test("manual end entry persists without an end now action", async () => {
   await mount("popup");
   assert.equal(document.querySelector("#setStartNow"), null);
-  enter("#workStart", "800");
-  assert.equal(document.querySelector("#setEndNow").disabled, false);
-  const before = currentTime();
-  click("#setEndNow");
-  await flush();
-  const end = document.querySelector("#workEnd").value;
-  assert.ok([before, currentTime()].includes(end));
-  assert.equal(stored[STORAGE_KEY].draft.workEnd, end);
-  assert.equal(document.querySelector("#error").hidden, true);
-});
-
-test("end now records the time even when the start has not been entered yet", async () => {
-  await mount("popup");
-  const before = currentTime();
-  click("#setEndNow");
-  await flush();
-  const end = document.querySelector("#workEnd").value;
-  assert.ok([before, currentTime()].includes(end), "Clicking end now must fill the end time");
-  assert.equal(stored[STORAGE_KEY].draft.workEnd, end);
-  assert.equal(stored[STORAGE_KEY].draft.workStart, "");
-  assert.equal(document.querySelector("#error").hidden, true);
+  assert.equal(document.querySelector("#setEndNow"), null);
   enter("#workStart", "800");
   await flush();
-  assert.equal(stored[STORAGE_KEY].draft.workEnd, end);
-});
-
-test("end now replaces an invalid end without changing the start or breaks", async () => {
-  await mount("popup");
-  enter("#workStart", "29:00");
-  click("#addBreak30");
-  enter("#workEnd", "29:00");
-  event(document.querySelector("#workEnd"), "blur");
-  assert.equal(document.querySelector("#workEnd").getAttribute("aria-invalid"), "true");
-  const before = currentTime();
-  click("#setEndNow");
-  await flush();
-  assert.ok([before, currentTime()].includes(stored[STORAGE_KEY].draft.workEnd));
-  assert.equal(stored[STORAGE_KEY].draft.workStart, "29:00");
-  assert.deepEqual(stored[STORAGE_KEY].draft.breaks, [{ duration: 30 }]);
-  assert.equal(document.querySelector("#workEnd").hasAttribute("aria-invalid"), false);
-});
-
-test("end now stays unavailable for historical dates, vacation and compensation", async () => {
-  await mount("popup");
-  for (const id of ["#vacationDay", "#compensationDay"]) {
-    check(id);
-    await flush();
-    assert.equal(document.querySelector("#setEndNow").disabled, true);
-    click("#setEndNow");
-    await flush();
-    assert.equal(stored[STORAGE_KEY].draft.workEnd, "");
-    check(id, false);
-    await flush();
-  }
-  enter("#dayDate", yesterday, "change");
-  await flush();
-  assert.equal(document.querySelector("#setEndNow").disabled, true);
-  click("#setEndNow");
-  await flush();
+  assert.equal(document.querySelector("#workEnd").value, "");
   assert.equal(stored[STORAGE_KEY].draft.workEnd, "");
+  enter("#workEnd", "1700");
+  event(document.querySelector("#workEnd"), "blur");
+  await flush();
+  assert.equal(document.querySelector("#workEnd").value, "17:00");
+  assert.equal(stored[STORAGE_KEY].draft.workEnd, "17:00");
+  assert.equal(document.querySelector("#workedDisplay").textContent, "9:00");
+  assert.equal(document.querySelector("#error").hidden, true);
 });
 
 test("main view persists fast input, hidden pause pages and date navigation under the old date", async () => {
