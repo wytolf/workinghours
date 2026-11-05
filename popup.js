@@ -1,4 +1,5 @@
 import { formatDate, localDate } from "./dates.js";
+import { createHistoryBackup, MAX_BACKUP_BYTES, parseHistoryBackup } from "./history-backup.js";
 import { dailyTarget, weeklyTarget } from "./statistics-calculations.js";
 import { calculateWork, currentTime, formatDuration, formatTimeWhileTyping, normalizeTime } from "./time-calculations.js";
 import { applyTheme, onDataChanged, openWindow, send } from "./storage.js";
@@ -257,6 +258,47 @@ for (const [id, key, max] of [["weeklyHours", "weeklyTargetMinutes", 168], ["vac
   });
 }
 for (const button of document.querySelectorAll("[data-theme-option]")) button.addEventListener("click", () => saveSettings({ theme: button.dataset.themeOption }));
+
+function transferHistory(task) {
+  if (busy) return;
+  clearErrors();
+  $("#backupStatus").hidden = true;
+  setBusy(true);
+  enqueue(task).catch(() => {}).finally(() => setBusy(false));
+}
+
+$("#exportHistory").addEventListener("click", () => transferHistory(async () => {
+  const latest = await send({ type: "read" });
+  const backup = createHistoryBackup(latest);
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `arbeitszeit-history-${localDate()}.json`;
+  document.body.append(link);
+  try {
+    link.click();
+    $("#backupStatus").textContent = `Export mit ${backup.history.length} gespeicherten Tagen zum Download übergeben.`;
+    $("#backupStatus").hidden = false;
+  } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+}));
+$("#importHistory").addEventListener("click", () => { if (!busy) $("#historyFile").click(); });
+$("#historyFile").addEventListener("change", () => {
+  const file = $("#historyFile").files?.[0];
+  $("#historyFile").value = "";
+  if (!file) return;
+  transferHistory(async () => {
+    if (file.size > MAX_BACKUP_BYTES) throw new Error("Die Sicherung darf höchstens 10 MB groß sein. Es wurden keine Daten importiert.");
+    const backup = parseHistoryBackup(await file.text());
+    const updated = await send({ type: "importHistory", backup });
+    acceptExternal(updated);
+    $("#backupStatus").textContent = "Import abgeschlossen. Fehlende Tage wurden ergänzt; vorhandene Tage bleiben erhalten.";
+    $("#backupStatus").hidden = false;
+  });
+});
+
 $("#openHistory").addEventListener("click", () => {
   if (busy) return;
   const fields = capture(), capturedVersion = version;

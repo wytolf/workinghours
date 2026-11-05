@@ -450,7 +450,31 @@ Offizielle technische Grundlagen:
 
 ## 11. Umfang und Freigabe
 
-Dieses Dokument beschreibt den freigegebenen Umfang. Nicht Bestandteil sind Export/Import,
-Synchronisierung, Feiertagskalender, Teilferien, stundenweise Kompensationsbuchungen
+Dieses Dokument beschreibt den ursprünglich freigegebenen Umfang. Export/Import
+wurde am 05.11.2026 zusätzlich beauftragt und wie unten beschrieben ergänzt.
+Nicht Bestandteil sind Synchronisierung, Feiertagskalender, Teilferien, stundenweise Kompensationsbuchungen
 oder zusätzliche Auswertungsfilter. Die Freigabe umfasst auch die als Vorschlag
 gekennzeichneten Festlegungen.
+
+## 12. Ergänzung: History-Import und -Export
+
+- Zwei Aktionen in den Einstellungen sichern und laden eine lokale JSON-Datei
+  (`workinghours-history`, Dateiversion 1). Enthalten sind gespeicherte Tage und
+  der Sollstundenverlauf; der Entwurf und weitere Einstellungen sind ausgenommen.
+- Der Import ergänzt fehlende Datumswerte, erhält vorhandene Einträge und verwendet
+  bei Duplikaten in der Datei den ersten. Interne IDs und Revisionen werden neu
+  vergeben. Wiederholter Import ist ohne weitere Änderung möglich.
+- Bei leerer History wird der importierte Sollverlauf bis gestern übernommen.
+  Ab heute bleiben die lokalen Wochenstunden wirksam. Bei vorhandener History
+  bleibt der lokale Sollverlauf unverändert.
+- Der Hintergrundprozess validiert die vollständige Sicherung und speichert atomar
+  innerhalb seiner bisherigen Warteschlange. Ungültige Dateien oder unbekannte
+  Versionen verändern keine Daten. Die Dateiauswahl akzeptiert höchstens 10 MB.
+- Eine offene Erfassung bleibt erhalten. Bei einem bearbeiteten Entwurf für einen
+  neu importierten Tag wird ein Konflikt gesetzt; veraltete Entwurfsrevisionen
+  dürfen die importierten Daten nicht überschreiben.
+- Automatisierte Prüfungen decken JSON-Rundlauf mit unveränderter historischer
+  Statistik, Tagesarten, Pausen, unvollständige Tage, Duplikate, ungültige Dateien,
+  Dateigröße, Speicherfehler, gleichzeitige Änderungen und die Einstellungsaktionen ab.
+- Eine visuelle Prüfung der Ergänzung im echten Chromium konnte wegen der
+  Browserrichtlinie für lokale Dateien nicht durchgeführt werden.

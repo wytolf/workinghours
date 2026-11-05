@@ -371,4 +371,6 @@ dialog button.ghost { width: 100%; margin-top: 12px; }
 .quality-card h2, .quality-card strong { font-size: 13px; }
 .hint { line-height: 1.5; }
 .settings-note { line-height: 1.6; }
+.backup-card { margin-top: 12px; }
+.backup-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .empty-state p { font-size: 13px; line-height: 1.7; color: var(--text-muted); }

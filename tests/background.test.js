@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { localDate } from "../dates.js";
-import { LEGACY_KEY, STORAGE_KEY } from "../state.js";
+import { emptyDay, LEGACY_KEY, migrate, STORAGE_KEY } from "../state.js";
+import { createHistoryBackup } from "../history-backup.js";
 
 let stored = {}, failWrite = false, messageListener;
 globalThis.chrome = {
@@ -17,6 +18,18 @@ globalThis.chrome = {
   runtime: { id: "test-extension", onMessage: { addListener(listener) { messageListener = listener; } } },
 };
 const { enqueue } = await import("../background.js");
+
+test("history import serializes with settings and preserves all unrelated stored data", async () => {
+  const initial = migrate(null, localDate()), incoming = migrate(null, localDate());
+  incoming.history = [{ ...emptyDay("2026-10-01"), kind: "compensation", id: "old", revision: 4 }];
+  stored = { [STORAGE_KEY]: initial, [LEGACY_KEY]: { workStart: "08:00" } };
+  await Promise.all([enqueue({ type: "settings", patch: { theme: "dark" } }),
+    enqueue({ type: "importHistory", backup: createHistoryBackup(incoming) })]);
+  assert.equal(stored[STORAGE_KEY].settings.theme, "dark");
+  assert.equal(stored[STORAGE_KEY].history.length, 1);
+  assert.deepEqual(stored[STORAGE_KEY].draft, initial.draft);
+  assert.deepEqual(stored[LEGACY_KEY], { workStart: "08:00" });
+});
 
 test("migration is durable and idempotent, and preserves the original undated source", async () => {
   stored = { [LEGACY_KEY]: { workStart: "08:00", targetTime: "08:30", theme: "dark", breaks: [] } };

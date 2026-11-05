@@ -120,6 +120,17 @@
           </fieldset>
         </section>
 
+        <section class="card backup-card" aria-labelledby="backupHeading">
+          <h2 id="backupHeading">History sichern und laden</h2>
+          <p class="hint">JSON-Datei mit gespeicherten Tagen und Sollstundenverlauf. Die aktuelle Erfassung ist nicht enthalten. Beim Import bleiben vorhandene Tage erhalten.</p>
+          <p class="hint">Das frühere Soll wird bei leerer History übernommen. Bei vorhandener History gilt der lokale Sollverlauf.</p>
+          <div class="backup-actions">
+            <button id="exportHistory" class="secondary" type="button">History exportieren</button>
+            <button id="importHistory" class="secondary" type="button">History importieren</button>
+          </div>
+          <input id="historyFile" type="file" accept=".json,application/json" aria-label="History-Sicherung auswählen" hidden />
+          <p id="backupStatus" class="hint" role="status" hidden></p>
+        </section>
         <p class="settings-note">Änderungen werden automatisch gespeichert.</p>
         <p id="settingsError" class="error-message" role="alert" hidden></p>
       </section>

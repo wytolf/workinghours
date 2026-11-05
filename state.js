@@ -1,4 +1,5 @@
 import { parseDate } from "./dates.js";
+import { importHistory } from "./history-backup.js";
 import { canonicalDays } from "./statistics-calculations.js";
 import { hasContent, normalizeTime, timeToMinutes, validTimes } from "./time-calculations.js";
 
@@ -87,6 +88,9 @@ export function applyCommand(current, command, today, makeId = () => crypto.rand
     throw new Error("Die Erfassung wurde in einem anderen Fenster geändert. Bitte das Fenster erneut öffnen; deine letzte lokal gesicherte Erfassung bleibt erhalten.");
   }
   switch (command.type) {
+    case "importHistory":
+      if (!importHistory(data, command.backup, today, makeId)) return current;
+      break;
     case "saveDraft": {
       const before = JSON.stringify(dayFields(data.draft));
       const fields = command.fields;

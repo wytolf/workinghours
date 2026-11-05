@@ -12,6 +12,7 @@ Ferien, Überzeitkompensation und Statistiken. Alle Daten bleiben im Browser.
 - Live-Berechnung für den heutigen Tag, solange kein Feierabend eingetragen ist
 - Anzeige von Arbeitszeit, Überzeit und Minuszeit
 - Eigene Einstellungen für Wochenstunden, Feriengutschrift sowie Hell- und Dunkelmodus
+- History in den Einstellungen als JSON-Datei exportieren und wieder importieren
 - Automatische lokale Speicherung über `chrome.storage.local`
 - Tagesauswahl mit automatischer History-Speicherung vor dem Datumswechsel
 - Kalender mit markierten gespeicherten Tagen, Tagesdetails und Löschfunktion
@@ -45,6 +46,34 @@ Design. Dabei schließt Chromium das Toolbar-Popup; der Entwurf wird vorher
 gesichert. Die History bietet ausschließlich Ansicht und Löschen, keine Bearbeitung.
 Das Datum ist nur in der Hauptansicht bearbeitbar. Ein geöffneter Entwurf wechselt
 auch um Mitternacht nicht automatisch auf ein anderes Datum.
+
+## History sichern und laden
+
+In den **Einstellungen** unter **History sichern und laden** stehen zwei Aktionen:
+
+- **History exportieren:** Lädt eine JSON-Datei mit allen gespeicherten Tagen,
+  einschließlich Zeiten, Pausen, Tagesarten, Feriengutschriften und Sollstundenverlauf,
+  herunter. Die aktuelle Erfassung ist nicht enthalten; diese bei Bedarf zuerst mit
+  einem Datumswechsel oder **Neuen Tag beginnen** in der History speichern.
+- **History importieren:** Eine zuvor exportierte JSON-Datei auswählen. Fehlende Tage
+  werden ergänzt. Bereits vorhandene Tage bleiben erhalten, auch bei abweichenden
+  Werten in der Datei. Bei doppelten Datumswerten in der Datei gilt der erste Eintrag.
+  Wiederholtes Importieren erzeugt keine Duplikate.
+
+Bei leerer History übernimmt der Import auch den Sollstundenverlauf bis gestern,
+damit frühere Statistiken wiederhergestellt werden. Ab heute gelten weiterhin die
+lokalen Wochenstunden. Bei bereits vorhandener History bleibt der gesamte lokale
+Sollstundenverlauf maßgebend. Darstellung und aktuelle Feriengutschrift bleiben
+erhalten. Die angezeigte Erfassung wird nicht durch die importierten Zeiten ersetzt.
+Ist sie bereits bearbeitet und betrifft einen neu importierten Tag, schützt die
+bestehende Konfliktanzeige vor versehentlichem Überschreiben.
+
+Fehlerhafte Dateien, unbekannte Dateiversionen und Dateien über 10 MB werden mit
+einer Fehlermeldung abgewiesen. Die Datei wird vollständig geprüft, bevor der
+Hintergrundprozess die Daten gemeinsam speichert. Bei Speicherfehlern wird kein
+erfolgreicher Import angezeigt. Sicherungen werden ausschließlich lokal verarbeitet.
+Die Exportdatei enthält persönliche Arbeitszeiten und kann an einem selbst gewählten
+Ort aufbewahrt werden.
 
 ## Tagesarten und Einstellungen
 

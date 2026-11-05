@@ -5,6 +5,7 @@ import { setTimeout as pause } from "node:timers/promises";
 import { parseHTML } from "linkedom";
 import { localDate, shiftDate } from "../dates.js";
 import { draftFor, emptyDay, migrate, STORAGE_KEY } from "../state.js";
+import { createHistoryBackup, MAX_BACKUP_BYTES } from "../history-backup.js";
 
 let stored = {}, listeners = new Set(), opened = [], failWrite = false, scriptId = 0;
 const today = localDate(), yesterday = shiftDate(today, -1);
@@ -62,6 +63,75 @@ function event(element, type) { element.dispatchEvent(new window.Event(type, { b
 function enter(selector, value, type = "input") { const element = document.querySelector(selector); element.value = value; event(element, type); }
 function click(selector) { event(document.querySelector(selector), "click"); }
 function check(selector, value = true) { document.querySelector(selector).checked = value; event(document.querySelector(selector), "change"); }
+function importFile(text, size = text.length) {
+  const input = document.querySelector("#historyFile");
+  input.files = [{ size, async text() { return text; } }];
+  event(input, "change");
+}
+
+test("settings export a JSON download with current history and no draft", async () => {
+  const initial = migrate(null, today); initial.history = [day(yesterday)];
+  await mount("popup", initial); click("#openSettings");
+  const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL;
+  const originalTimeout = globalThis.setTimeout;
+  let blob, link, revoked;
+  URL.createObjectURL = value => { blob = value; return "blob:test-history"; };
+  URL.revokeObjectURL = value => { revoked = value; };
+  globalThis.setTimeout = callback => { callback(); };
+  const originalClick = window.HTMLElement.prototype.click;
+  window.HTMLElement.prototype.click = function () { if (this.tagName === "A") link = this; };
+  try {
+    click("#exportHistory"); await flush();
+    const backup = JSON.parse(await blob.text());
+    assert.equal(backup.history[0].date, yesterday);
+    assert.equal(backup.draft, undefined);
+    assert.equal(link.getAttribute("download"), `arbeitszeit-history-${today}.json`);
+    assert.equal(revoked, "blob:test-history");
+    assert.match(document.querySelector("#backupStatus").textContent, /1 gespeicherten Tagen/);
+    assert.equal(document.querySelector("#exportHistory").disabled, false);
+    assert.deepEqual(stored[STORAGE_KEY], initial);
+  } finally {
+    URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke;
+    globalThis.setTimeout = originalTimeout;
+    window.HTMLElement.prototype.click = originalClick;
+  }
+});
+
+test("settings import a file, support repeating it and retain an edited draft", async () => {
+  const initial = migrate(null, today), saved = migrate(null, today);
+  saved.history = [day(yesterday), day(today)];
+  await mount("popup", initial); enter("#workStart", "900"); await flush(); click("#openSettings");
+  const json = JSON.stringify(createHistoryBackup(saved));
+  importFile(json); await flush();
+  assert.equal(stored[STORAGE_KEY].history.length, 2);
+  assert.equal(stored[STORAGE_KEY].draft.workStart, "9:00");
+  assert.equal(stored[STORAGE_KEY].draft.conflict, true);
+  assert.equal(document.querySelector("#historyFile").value, "");
+  assert.equal(document.querySelector("#backupStatus").hidden, false);
+  const revision = stored[STORAGE_KEY].revision;
+  importFile(json); await flush();
+  assert.equal(stored[STORAGE_KEY].revision, revision);
+  click("#closeSettings");
+  assert.equal(document.querySelector("#workStart").value, "9:00");
+});
+
+test("settings reject malformed or oversized files and report write failures without success", async () => {
+  await mount("popup"); click("#openSettings");
+  const before = structuredClone(stored[STORAGE_KEY]);
+  for (const [text, size, message] of [["invalid", 7, /gültige.*Sicherung/], ["{}", MAX_BACKUP_BYTES + 1, /10 MB/]]) {
+    importFile(text, size); await flush();
+    assert.match(document.querySelector("#settingsError").textContent, message);
+    assert.equal(document.querySelector("#backupStatus").hidden, true);
+    assert.deepEqual(stored[STORAGE_KEY], before);
+    assert.equal(document.querySelector("#importHistory").disabled, false);
+  }
+  const saved = migrate(null, today); saved.history = [day(yesterday)];
+  failWrite = true;
+  importFile(JSON.stringify(createHistoryBackup(saved))); await flush();
+  assert.match(document.querySelector("#settingsError").textContent, /Speicher voll/);
+  assert.equal(document.querySelector("#backupStatus").hidden, true);
+  assert.deepEqual(stored[STORAGE_KEY], before);
+});
 
 test("manual end entry persists without an end now action", async () => {
   await mount("popup");
