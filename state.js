@@ -36,7 +36,7 @@ export function migrate(legacy, today) {
     ? { duration: Number(pause.duration) } : { start: pause.start ?? "", end: pause.end ?? "" }) : [];
   if (hasContent(draft)) { draft.date = null; draft.changedSinceLoad = true; }
   return { schemaVersion: 2, revision: 0, draftRevision: 0, settings: {
-    theme: old.theme === "dark" ? "dark" : "light", vacationCreditMinutes: 510,
+    theme: old.theme === "dark" ? "dark" : "light", language: "de", vacationCreditMinutes: 510,
     targetSchedule: { baselineWeeklyMinutes: daily * 5, changes: [] },
   }, draft, history: [] };
 }
@@ -158,6 +158,10 @@ export function applyCommand(current, command, today, makeId = () => crypto.rand
     }
     case "settings": {
       const patch = command.patch ?? {};
+      if ("language" in patch) {
+        if (!["de", "en", "nb", "fr"].includes(patch.language)) throw new Error("Ungültige Sprache.");
+        data.settings.language = patch.language;
+      }
       if ("theme" in patch) {
         if (!["light", "dark"].includes(patch.theme)) throw new Error("Ungültige Darstellung.");
         data.settings.theme = patch.theme;

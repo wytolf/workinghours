@@ -556,3 +556,73 @@ test("statistics have an explicit empty state for only today's saved entry", asy
   assert.equal(document.querySelector("#emptyState").hidden, false);
   assert.equal(document.querySelector("#statisticsContent").hidden, true);
 });
+
+test("language setting persists and translates the popup, calendar, history and statistics", async () => {
+  const labels = {
+    de: ["Arbeitszeit", "Einstellungen", "Statistik", "Ferientag"],
+    en: ["Working hours", "Settings", "Statistics", "Vacation day"],
+    nb: ["Arbeidstid", "Innstillinger", "Statistikk", "Feriedag"],
+    fr: ["Temps de travail", "Paramètres", "Statistiques", "Jour de congé"],
+  };
+  for (const [language, [title, settings, statistics, vacation]] of Object.entries(labels)) {
+    const initial = migrate(null, today);
+    initial.settings.language = language;
+    initial.history = [day(yesterday, { kind: "vacation", vacationCreditMinutes: 510 })];
+    await mount("popup", initial);
+    assert.equal(document.documentElement.lang, language);
+    assert.equal(document.querySelector("h1").textContent, title);
+    assert.match(document.querySelector("#vacationDay").parentElement.textContent, new RegExp(vacation));
+    click("#dayDate");
+    assert.equal(document.querySelector("#previousMonth").getAttribute("aria-label"), {
+      de: "Vorheriger Monat", en: "Previous month", nb: "Forrige måned", fr: "Mois précédent",
+    }[language]);
+    click("#openSettings");
+    assert.equal(document.querySelector("#settingsView h1").textContent, settings);
+    assert.equal(document.querySelector("#language").value, language);
+    await mount("history", initial);
+    assert.equal(document.querySelector("#openStatistics").textContent, {
+      de: "Statistik öffnen", en: "Open statistics", nb: "Åpne statistikk", fr: "Ouvrir les statistiques",
+    }[language]);
+    click(`button[data-date="${yesterday}"]`);
+    assert.equal(document.querySelector("#detailKind").textContent, vacation);
+    await mount("statistics", initial);
+    assert.equal(document.querySelector("h1").textContent, statistics);
+    assert.equal(document.querySelector("#statisticsContent").hidden, false);
+  }
+  await mount("popup");
+  click("#openSettings");
+  for (const [language, heading] of [["en", "Settings"], ["nb", "Innstillinger"], ["fr", "Paramètres"], ["de", "Einstellungen"]]) {
+    for (const option of document.querySelector("#language").options) option.selected = false;
+    document.querySelector(`#language option[value="${language}"]`).selected = true;
+    event(document.querySelector("#language"), "change"); await flush();
+    assert.equal(stored[STORAGE_KEY].settings.language, language);
+    assert.equal(document.querySelector("#language").value, language);
+    assert.equal(document.querySelector("#settingsView h1").textContent, heading);
+  }
+});
+
+test("an outdated background worker explains why a chosen language was not saved", async () => {
+  await mount("popup"); click("#openSettings");
+  const original = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = message => original(message.command.type === "settings" && "language" in message.command.patch
+    ? { ...message, command: { ...message.command, patch: {} } } : message);
+  try {
+    for (const option of document.querySelector("#language").options) option.selected = false;
+    document.querySelector('#language option[value="en"]').selected = true;
+    event(document.querySelector("#language"), "change"); await flush();
+    assert.equal(stored[STORAGE_KEY].settings.language, "de");
+    assert.equal(document.querySelector("#settingsError").hidden, false);
+    assert.match(document.querySelector("#settingsError").textContent, /neu laden/);
+  } finally { chrome.runtime.sendMessage = original; }
+});
+
+test("an external save does not reset a language choice while the dropdown is in use", async () => {
+  await mount("popup"); click("#openSettings");
+  const select = document.querySelector("#language");
+  select.focus();
+  select.querySelector('[value="fr"]').selected = true;
+  await enqueue({ type: "settings", patch: { theme: "dark" } }); await flush();
+  assert.equal(select.value, "fr");
+  event(select, "change"); await flush();
+  assert.equal(stored[STORAGE_KEY].settings.language, "fr");
+});

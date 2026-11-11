@@ -4,6 +4,7 @@ import { createHistoryBackup, MAX_BACKUP_BYTES, parseHistoryBackup } from "./his
 import { dailyTarget, weeklyTarget } from "./statistics-calculations.js";
 import { calculateWork, currentTime, formatDuration, formatTimeWhileTyping, normalizeTime } from "./time-calculations.js";
 import { applyTheme, onDataChanged, openWindow, send } from "./storage.js";
+import { formatNumber, setLanguage, t, translateTree } from "./i18n.js";
 
 const $ = selector => document.querySelector(selector);
 let data, view, queue = Promise.resolve(), pending = 0, external = null, version = 0, busy = true;
@@ -16,7 +17,7 @@ const calendar = createCalendar($("#dateCalendar"), { selectEmpty: true, onSelec
 
 function showError(error) {
   const target = dateDialog.open ? $("#dateError") : $("#settingsView").hidden ? $("#error") : $("#settingsError");
-  target.textContent = error.message;
+  target.textContent = t(error.message);
   target.hidden = false;
 }
 
@@ -29,6 +30,7 @@ function clearErrors() {
 function acceptExternal(updated) {
   const draftChanged = updated.draftRevision !== data.draftRevision;
   data = updated;
+  applyLanguage();
   renderDatePicker();
   if (unsaved && draftChanged) {
     stale = true;
@@ -151,7 +153,7 @@ function addBreakRow(pause = { start: "", end: "" }, focus = false) {
   row.dataset.kind = fixed ? "fixed" : "timed";
   if (fixed) {
     row.dataset.duration = pause.duration;
-    row.querySelector(".fixed-break-duration").textContent = `${pause.duration} Min`;
+    row.querySelector(".fixed-break-duration").textContent = `${pause.duration} ${t("Min")}`;
   } else {
     const id = ++breakCounter;
     for (const [index, part] of ["start", "end"].entries()) {
@@ -162,6 +164,7 @@ function addBreakRow(pause = { start: "", end: "" }, focus = false) {
       attachTimeInput(input);
     }
   }
+  translateTree(row);
   row.querySelector(".remove-break").addEventListener("click", () => {
     row.remove(); updateBreakPagination(); edited();
   });
@@ -194,12 +197,12 @@ function calculate() {
   $("#workedDisplay").textContent = formatDuration(result.worked);
   $("#targetDisplay").textContent = view.date ? formatDuration(target) : "—";
   $("#balanceDisplay").textContent = view.date ? formatDuration(balance, true) : "—";
-  $("#balanceLabel").textContent = balance > 0 ? "Überzeit" : balance < 0 ? "Minuszeit" : "Saldo";
+  $("#balanceLabel").textContent = t(balance > 0 ? "Überzeit" : balance < 0 ? "Minuszeit" : "Saldo");
   $("#balanceCard").className = `balance ${balance > 0 ? "positive" : balance < 0 ? "negative" : "neutral"}`;
-  $("#dayLabel").textContent = !view.date ? "DATUM ZUORDNEN" : view.date === today ? "HEUTE" : formatDate(view.date, { weekday: "long" });
+  $("#dayLabel").textContent = !view.date ? t("DATUM ZUORDNEN") : view.date === today ? t("HEUTE") : formatDate(view.date, { weekday: "long" });
   $("#migrationHint").hidden = view.date !== null;
   $("#vacationNote").hidden = view.kind !== "vacation";
-  $("#vacationNote").textContent = `Feriengutschrift: ${formatDuration(credit)} Std. (für diesen Tag gespeichert)`;
+  $("#vacationNote").textContent = `${t("Feriengutschrift")}: ${formatDuration(credit)} ${t("Std.")} (${t("für diesen Tag gespeichert")})`;
   $("#timeFields").disabled = busy || view.kind !== "work";
   let message = "Erfassung automatisch lokal gesichert. History-Speicherung beim Datumswechsel oder mit „Neuen Tag beginnen“.";
   if (view.conflict) message = "Dieser gespeicherte Tag wurde inzwischen geändert oder gelöscht. Deine Erfassung bleibt hier erhalten; bitte vor dem Zurücksetzen bei Bedarf die Zeiten sichern.";
@@ -208,24 +211,28 @@ function calculate() {
   else if (view.kind === "vacation") message = "Es zählt ausschließlich die gespeicherte Feriengutschrift.";
   else if (result.incompleteBreaks && live) message = "Unvollständige Pause: für die Statistik bitte beide Uhrzeiten ergänzen.";
   else if (view.workStart && !view.workEnd) message = live ? "Live-Berechnung bis zur aktuellen Uhrzeit. Für die Statistik bitte Feierabend ergänzen." : "Unvollständig: Für historische Arbeitsstunden bitte Feierabend ergänzen.";
-  $("#message").textContent = message;
+  $("#message").textContent = t(message);
 }
 
 function renderSettings() {
   $("#deleteAllHistory").disabled = busy || !data.history.length;
-  const hours = value => Number((value / 60).toFixed(4)).toLocaleString("de-CH", { maximumFractionDigits: 4, useGrouping: false });
+  const hours = value => formatNumber(Number((value / 60).toFixed(4)), { maximumFractionDigits: 4, useGrouping: false });
+  if (document.activeElement !== $("#language")) {
+    $("#language").querySelector(`option[value="${data.settings.language ?? "de"}"]`).selected = true;
+  }
   if (document.activeElement !== $("#weeklyHours")) $("#weeklyHours").value = hours(weeklyTarget(data.settings, localDate()));
   if (document.activeElement !== $("#vacationHours")) $("#vacationHours").value = hours(data.settings.vacationCreditMinutes);
   for (const button of document.querySelectorAll("[data-theme-option]")) button.setAttribute("aria-pressed", String(button.dataset.themeOption === data.settings.theme));
 }
 
 function renderDatePicker() {
-  $("#dayDate").textContent = view.date ? formatDate(view.date) : "Datum wählen";
-  $("#dayDate").setAttribute("aria-label", view.date ? `Datum wählen, ${formatDate(view.date)}` : "Datum wählen");
+  $("#dayDate").textContent = view.date ? formatDate(view.date) : t("Datum wählen");
+  $("#dayDate").setAttribute("aria-label", view.date ? `${t("Datum wählen")}, ${formatDate(view.date)}` : t("Datum wählen"));
   if (dateDialog.open) calendar.update({ history: data.history, selectedDate: view.date, disabled: busy });
 }
 
 function render() {
+  applyLanguage();
   applyTheme(data.settings.theme);
   renderDatePicker();
   $("#workStart").value = view.workStart;
@@ -236,6 +243,12 @@ function render() {
   view.breaks.forEach(pause => addBreakRow(pause));
   renderSettings();
   calculate();
+}
+
+function applyLanguage() {
+  setLanguage(data.settings.language);
+  translateTree();
+  calendar.translate();
 }
 
 for (const id of ["workStart", "workEnd"]) attachTimeInput($(`#${id}`));
@@ -270,7 +283,11 @@ $("#closeSettings").addEventListener("click", () => { cancelHistoryDeletion(); $
 function saveSettings(patch) {
   clearErrors();
   enqueue(async () => {
-    acceptExternal(await send({ type: "settings", patch }));
+    const updated = await send({ type: "settings", patch });
+    if ("language" in patch && updated.settings.language !== patch.language) {
+      throw new Error("Die Sprache konnte nicht gespeichert werden. Bitte die Erweiterung auf der Erweiterungsseite über den runden Pfeil neu laden und erneut wählen.");
+    }
+    acceptExternal(updated);
     applyTheme(data.settings.theme);
     for (const button of document.querySelectorAll("[data-theme-option]")) button.setAttribute("aria-pressed", String(button.dataset.themeOption === data.settings.theme));
     calculate();
@@ -281,7 +298,7 @@ for (const [id, key, max] of [["weeklyHours", "weeklyTargetMinutes", 168], ["vac
     const input = $(`#${id}`), value = input.value.trim().replace(",", ".");
     if (!/^\d+(\.\d{1,4})?$/.test(value) || Number(value) > max) {
       input.setAttribute("aria-invalid", "true");
-      showError(new Error(`Bitte eine Stundenzahl zwischen 0 und ${max} eingeben, zum Beispiel 8,5.`));
+      showError(new Error(t("Bitte eine Stundenzahl zwischen 0 und {max} eingeben, zum Beispiel 8,5.").replace("{max}", max)));
       return;
     }
     input.removeAttribute("aria-invalid");
@@ -289,6 +306,7 @@ for (const [id, key, max] of [["weeklyHours", "weeklyTargetMinutes", 168], ["vac
   });
 }
 for (const button of document.querySelectorAll("[data-theme-option]")) button.addEventListener("click", () => saveSettings({ theme: button.dataset.themeOption }));
+$("#language").addEventListener("change", () => saveSettings({ language: $("#language").value }));
 
 function transferHistory(task) {
   if (busy) return;
@@ -309,7 +327,7 @@ $("#exportHistory").addEventListener("click", () => transferHistory(async () => 
   document.body.append(link);
   try {
     link.click();
-    $("#backupStatus").textContent = `Export mit ${backup.history.length} gespeicherten Tagen zum Download übergeben.`;
+    $("#backupStatus").textContent = t("Export mit {days} gespeicherten Tagen zum Download übergeben.").replace("{days}", backup.history.length);
     $("#backupStatus").hidden = false;
   } finally {
     link.remove();
@@ -331,9 +349,9 @@ $("#historyFile").addEventListener("change", () => {
     const backup = parseHistoryBackup(await file.text());
     const updated = await send({ type: "importHistoryWithMode", backup, mode });
     acceptExternal(updated);
-    $("#backupStatus").textContent = mode === "overwrite"
+    $("#backupStatus").textContent = t(mode === "overwrite"
       ? "Import abgeschlossen. Tage aus der Datei wurden übernommen; vorhandene Tage desselben Datums wurden überschrieben."
-      : "Import abgeschlossen. Fehlende Tage wurden ergänzt; vorhandene Tage bleiben erhalten.";
+      : "Import abgeschlossen. Fehlende Tage wurden ergänzt; vorhandene Tage bleiben erhalten.");
     $("#backupStatus").hidden = false;
   });
 });
@@ -356,7 +374,7 @@ $("#confirmDeleteHistory").addEventListener("click", () => {
   const expectedHistory = historyDeletion;
   transferHistory(async () => {
     acceptExternal(await send({ type: "deleteAllHistory", expectedHistory }));
-    $("#backupStatus").textContent = "Alle History-Einträge wurden gelöscht.";
+    $("#backupStatus").textContent = t("Alle History-Einträge wurden gelöscht.");
     $("#backupStatus").hidden = false;
   });
 });

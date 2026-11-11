@@ -12,6 +12,8 @@ Ferien, Überzeitkompensation und Statistiken. Alle Daten bleiben im Browser.
 - Live-Berechnung für den heutigen Tag, solange kein Feierabend eingetragen ist
 - Anzeige von Arbeitszeit, Überzeit und Minuszeit
 - Eigene Einstellungen für Wochenstunden, Feriengutschrift sowie Hell- und Dunkelmodus
+- Sprachwahl in den Einstellungen: Deutsch, Englisch, Norwegisch (Bokmål) und Französisch. Die Auswahl gilt auch für History und Statistik und bleibt lokal gespeichert.
+- Name, Beschreibung und Symbolleisten-Titel der Erweiterung folgen der Browsersprache; die gewählte Sprache innerhalb der Erweiterung kann davon abweichen.
 - History als JSON-Datei exportieren und mit wählbarem Überschreiben importieren
 - Gesamte History in den Einstellungen nach Bestätigung löschen
 - Automatische lokale Speicherung über `chrome.storage.local`

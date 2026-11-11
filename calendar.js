@@ -1,5 +1,6 @@
 import { formatDate, localDate, parseDate } from "./dates.js";
 import { canonicalDays } from "./statistics-calculations.js";
+import { locale, t, translateTree } from "./i18n.js";
 
 const kindLabels = { work: "Arbeitstag", vacation: "Ferientag", compensation: "Überzeitkompensation" };
 
@@ -11,11 +12,12 @@ export function createCalendar(root, { onSelect, selectEmpty = false }) {
     <div class="calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
     <div id="calendarDays" class="calendar-days"></div>
     <div class="calendar-legend"><span class="legend-work">Arbeit</span><span class="legend-vacation">Ferien</span><span class="legend-compensation">Kompensation</span></div>`;
+  function translate() { translateTree(root); render(); }
 
   function render() {
     const first = parseDate(`${month}-01`);
     root.dataset.month = month;
-    $("#monthLabel").textContent = first.toLocaleDateString("de-CH", { month: "long", year: "numeric" });
+    $("#monthLabel").textContent = first.toLocaleDateString(locale(), { month: "long", year: "numeric" });
     const offset = (first.getDay() + 6) % 7;
     const last = new Date(first); last.setMonth(last.getMonth() + 1, 0);
     const days = canonicalDays(history), today = localDate();
@@ -30,7 +32,7 @@ export function createCalendar(root, { onSelect, selectEmpty = false }) {
       button.type = "button"; button.dataset.date = date;
       button.className = `calendar-day${entry ? ` has-entry ${entry.kind}` : ""}${date === selectedDate ? " selected" : ""}`;
       button.textContent = day; button.disabled = disabled || (!selectEmpty && !entry);
-      button.setAttribute("aria-label", `${formatDate(date)}${entry ? `, ${kindLabels[entry.kind]}, gespeichert` : ", kein Eintrag"}`);
+      button.setAttribute("aria-label", `${formatDate(date)}${entry ? `, ${t(kindLabels[entry.kind])}, ${t("gespeichert")}` : `, ${t("kein Eintrag")}`}`);
       if (selectEmpty) button.setAttribute("aria-pressed", String(date === selectedDate));
       if (date === today) { button.classList.add("today"); button.setAttribute("aria-current", "date"); }
       button.addEventListener("click", () => { if (!button.disabled) onSelect(date, entry); });
@@ -50,6 +52,7 @@ export function createCalendar(root, { onSelect, selectEmpty = false }) {
   $("#nextMonth").addEventListener("click", () => moveMonth(1));
 
   return {
+    translate,
     update(options) {
       if (options.month !== undefined) month = options.month;
       if (options.history !== undefined) history = options.history;
