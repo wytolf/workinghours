@@ -1,4 +1,5 @@
 import { parseDate } from "./dates.js";
+import { importHistory } from "./history-backup.js";
 import { canonicalDays } from "./statistics-calculations.js";
 import { hasContent, normalizeTime, timeToMinutes, validTimes } from "./time-calculations.js";
 
@@ -87,6 +88,25 @@ export function applyCommand(current, command, today, makeId = () => crypto.rand
     throw new Error("Die Erfassung wurde in einem anderen Fenster geändert. Bitte das Fenster erneut öffnen; deine letzte lokal gesicherte Erfassung bleibt erhalten.");
   }
   switch (command.type) {
+    case "importHistory":
+    case "importHistoryWithMode":
+      if (!importHistory(data, command.backup, today, makeId, command.type === "importHistory" ? "keep" : command.mode)) return current;
+      break;
+    case "deleteAllHistory": {
+      const expected = command.expectedHistory;
+      if (!Array.isArray(expected) || expected.length !== data.history.length || !expected.every((day, index) => day &&
+          day.date === data.history[index].date && day.id === data.history[index].id && day.revision === data.history[index].revision)) {
+        throw new Error("Die History wurde inzwischen geändert. Bitte das Löschen erneut aufrufen und bestätigen.");
+      }
+      if (!data.history.length) return current;
+      if (canonicalDays(data.history).has(data.draft.date)) {
+        if (data.draft.changedSinceLoad) data.draft.conflict = true;
+        else { data.draft.historyReference = null; data.draft.suppressedAfterDeletion = true; }
+        data.draftRevision++;
+      }
+      data.history = [];
+      break;
+    }
     case "saveDraft": {
       const before = JSON.stringify(dayFields(data.draft));
       const fields = command.fields;

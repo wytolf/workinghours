@@ -49,7 +49,7 @@ lokalen Datei war durch die Browserrichtlinie gesperrt.
   keinen vorhandenen. Leere Pausenzeilen zählen nicht als Inhalt. Unvollständige
   Erfassungen mit Inhalt sind speicherbar.
 - Gespeicherte Einträge werden ausschließlich über die Löschfunktion der History
-  entfernt.
+  oder die am 06.11.2026 ergänzte Aktion „Alle Datensätze löschen“ entfernt.
 - Tagesarten sind Arbeit, Ferien und vollständige Überzeitkompensation. Sie
   schließen sich gegenseitig aus. Vorhandene Zeiten und Pausen bleiben bei Ferien
   oder Kompensation erhalten, sind deaktiviert und werden nicht angerechnet.
@@ -270,15 +270,20 @@ Beispiele:
 
 ### Hauptansicht und Einstellungen
 
-- Datumsfeld in der Hauptansicht; die bisherige feste Überschrift „HEUTE“ passt
-  sich dem gewählten Datum an.
+- Datumsauswahl in der Hauptansicht über das gemeinsame Kalendermodul aus der
+  History: Monatsnavigation, Markierungen gespeicherter Arbeits-, Ferien- und
+  Kompensationstage sowie Hervorhebung des ausgewählten Tages. Auch leere Tage
+  sind hier auswählbar. Erst die Tagesauswahl löst den bisherigen Speicher- und
+  Ladeablauf aus; Blättern und Schließen verändern keine Daten. Die Überschrift
+  „HEUTE“ passt sich dem gewählten Datum an.
 - Checkbox „Ferientag“ und Checkbox „Überzeitkompensation“, die sich gegenseitig
   ausschalten. Ohne Markierung gilt Arbeitstag. Zeitfelder und Zeitaktionen sind
   bei einer Markierung deaktiviert; vorhandene Werte bleiben erhalten.
 - Bestehende Anzeige für gearbeitet, Soll und Saldo beibehalten. Feriengutschrift
   erscheint zusätzlich bei markierten Ferientagen, statt als Arbeitszeit zu gelten.
-- Button „History“ ergänzen. Im Footer stehen weiterhin Start/Feierabend sowie
-  „Neuen Tag beginnen“ und neu „Tag zurücksetzen“ als getrennte Aktionen.
+- Button „History“ ergänzen. Im Footer stehen „Neuen Tag beginnen“ und
+  „Tag zurücksetzen“ als getrennte Aktionen. Beginn und Feierabend werden manuell
+  erfasst; die Aktion „Feierabend jetzt“ entfällt.
 - Einstellungen: Wochenstunden, Feriengutschrift in Stunden, Darstellung.
   Automatische Speicherung beibehalten. Das aktuelle Wochensoll und eine Änderung
   gelten ab heute; keine rückwirkende Datumsauswahl in den Einstellungen.
@@ -449,7 +454,45 @@ Offizielle technische Grundlagen:
 
 ## 11. Umfang und Freigabe
 
-Dieses Dokument beschreibt den freigegebenen Umfang. Nicht Bestandteil sind Export/Import,
-Synchronisierung, Feiertagskalender, Teilferien, stundenweise Kompensationsbuchungen
+Dieses Dokument beschreibt den ursprünglich freigegebenen Umfang. Export/Import
+wurde am 05.11.2026 zusätzlich beauftragt und wie unten beschrieben ergänzt.
+Nicht Bestandteil sind Synchronisierung, Feiertagskalender, Teilferien, stundenweise Kompensationsbuchungen
 oder zusätzliche Auswertungsfilter. Die Freigabe umfasst auch die als Vorschlag
 gekennzeichneten Festlegungen.
+
+## 12. Ergänzung: History-Import und -Export
+
+- Zwei Aktionen in den Einstellungen sichern und laden eine lokale JSON-Datei
+  (`workinghours-history`, Dateiversion 1). Enthalten sind gespeicherte Tage und
+  der Sollstundenverlauf; der Entwurf und weitere Einstellungen sind ausgenommen.
+- Seit der Ergänzung vom 06.11.2026 bietet der Import die Auswahl „Vorhandene Tage
+  behalten“ (Standard) oder „Vorhandene Tage überschreiben“. Fehlende Datumswerte
+  werden ergänzt; beim Überschreiben wird der erste lokale Eintrag desselben Datums
+  ersetzt. Andere Datumswerte und lokale Altduplikate bleiben erhalten. Bei Duplikaten
+  in der Datei gilt der erste. Neue Tage erhalten neue IDs und Revision 1; ersetzte
+  Tage behalten ihre ID und erhalten eine höhere Revision. Identische Werte werden
+  nicht erneut geschrieben.
+- Bei leerer History wird der importierte Sollverlauf bis gestern übernommen.
+  Ab heute bleiben die lokalen Wochenstunden wirksam. Bei vorhandener History
+  bleibt der lokale Sollverlauf unverändert.
+- Der Hintergrundprozess validiert die vollständige Sicherung und speichert atomar
+  innerhalb seiner bisherigen Warteschlange. Ungültige Dateien oder unbekannte
+  Versionen verändern keine Daten. Die Dateiauswahl akzeptiert höchstens 10 MB.
+- Eine unveränderte geladene Erfassung wird nach dem Überschreiben ihres Tages
+  aktualisiert. Ein leerer zurückgesetzter oder bereits bearbeiteter Entwurf bleibt
+  erhalten. Betrifft der Import einen bearbeiteten Entwurf, wird ein Konflikt gesetzt;
+  veraltete Entwurfsrevisionen dürfen die importierten Daten nicht überschreiben.
+- „Alle Datensätze löschen“ in den Einstellungen leert die History einschließlich
+  Altduplikaten nach Bestätigung. Einstellungen und Erfassung bleiben erhalten.
+  Die Bestätigung gilt für den zu diesem Zeitpunkt bekannten History-Bestand;
+  zwischenzeitliche Änderungen verhindern das Löschen. Unveränderte offene Entwürfe
+  dürfen gelöschte Tage nicht wiederherstellen; bearbeitete betroffene Entwürfe werden
+  als Konflikt erhalten. Ohne History ist die Aktion deaktiviert.
+- Automatisierte Prüfungen decken JSON-Rundlauf mit unveränderter historischer
+  Statistik, Tagesarten, Pausen, unvollständige Tage, Duplikate, ungültige Dateien,
+  Dateigröße, Speicherfehler, beide Importoptionen, bestätigtes Gesamtlöschen,
+  gleichzeitige Änderungen und die Einstellungsaktionen ab.
+- Die Ergänzung wurde im Erweiterungspopup von Microsoft Edge (Chromium) mit
+  einem separaten Testprofil in Hell und Dunkel geprüft. Beide Importoptionen,
+  JSON-Download, fehlerhafte Datei sowie Abbruch und Bestätigung beim Löschen
+  wurden überprüft.

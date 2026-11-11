@@ -25,7 +25,7 @@
         <div class="day-controls">
           <div class="field">
             <label for="dayDate">Datum</label>
-            <input id="dayDate" class="time-input" type="date" required />
+            <button id="dayDate" class="time-input date-picker-button" type="button" aria-haspopup="dialog" aria-controls="dateDialog">Datum wählen</button>
           </div>
           <div class="day-types">
             <label><input id="vacationDay" type="checkbox" /> Ferientag</label>
@@ -82,7 +82,6 @@
         <p id="error" class="error-message" role="alert" hidden></p>
 
         <footer>
-          <button id="setEndNow" class="primary" type="button">Feierabend jetzt</button>
           <button id="resetDay" class="ghost" type="button">Neuen Tag beginnen</button>
           <button id="discardDay" class="ghost" type="button">Tag zurücksetzen</button>
         </footer>
@@ -121,10 +120,39 @@
           </fieldset>
         </section>
 
+        <section class="card backup-card" aria-labelledby="backupHeading">
+          <h2 id="backupHeading">History sichern und laden</h2>
+          <div class="field import-mode">
+            <label for="historyImportMode">Beim Import</label>
+            <select id="historyImportMode" class="time-input">
+              <option value="keep" selected>Vorhandene Tage behalten</option>
+              <option value="overwrite">Vorhandene Tage überschreiben</option>
+            </select>
+          </div>
+          <div class="backup-actions">
+            <button id="exportHistory" class="secondary" type="button">History exportieren</button>
+            <button id="importHistory" class="secondary" type="button">History importieren</button>
+          </div>
+          <input id="historyFile" type="file" accept=".json,application/json" aria-label="History-Sicherung auswählen" hidden />
+          <button id="deleteAllHistory" class="secondary danger-text delete-history" type="button">Alle Datensätze löschen</button>
+          <div id="deleteHistoryConfirmation" class="delete-confirmation" role="group" aria-label="Gesamte History löschen" hidden>
+            <p>Alle gespeicherten History-Einträge endgültig löschen? Einstellungen und aktuelle Erfassung bleiben erhalten.</p>
+            <div class="dialog-actions">
+              <button id="cancelDeleteHistory" class="secondary" type="button">Abbrechen</button>
+              <button id="confirmDeleteHistory" class="danger" type="button">Alle löschen</button>
+            </div>
+          </div>
+          <p id="backupStatus" class="hint" role="status" hidden></p>
+        </section>
         <p class="settings-note">Änderungen werden automatisch gespeichert.</p>
         <p id="settingsError" class="error-message" role="alert" hidden></p>
       </section>
     </main>
+
+    <dialog id="dateDialog" class="date-dialog" aria-label="Datum wählen">
+      <div id="dateCalendar" class="calendar-card"></div>
+      <p id="dateError" class="error-message" role="alert" hidden></p>
+    </dialog>
 
     <template id="breakTemplate">
       <div class="break-row">

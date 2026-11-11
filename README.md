@@ -5,13 +5,15 @@ Ferien, Überzeitkompensation und Statistiken. Alle Daten bleiben im Browser.
 
 ## Funktionen
 
-- Arbeitsbeginn manuell setzen, Feierabend manuell oder mit „Feierabend jetzt“
+- Arbeitsbeginn und Feierabend manuell setzen
 - Zeiteingabe ohne Doppelpunkt: `800`, `0800` und `8:00` werden zu `08:00`
 - Beliebig viele Pausen hinzufügen und entfernen; kompakte Seitennavigation ohne Scrollen
 - Schnellbuttons für einen festen Abzug von 30 oder 60 Minuten Pause
 - Live-Berechnung für den heutigen Tag, solange kein Feierabend eingetragen ist
 - Anzeige von Arbeitszeit, Überzeit und Minuszeit
 - Eigene Einstellungen für Wochenstunden, Feriengutschrift sowie Hell- und Dunkelmodus
+- History als JSON-Datei exportieren und mit wählbarem Überschreiben importieren
+- Gesamte History in den Einstellungen nach Bestätigung löschen
 - Automatische lokale Speicherung über `chrome.storage.local`
 - Tagesauswahl mit automatischer History-Speicherung vor dem Datumswechsel
 - Kalender mit markierten gespeicherten Tagen, Tagesdetails und Löschfunktion
@@ -24,6 +26,17 @@ des Popups erhalten. In die **History** gelangen sie beim manuellen Wechsel auf
 ein anderes Datum oder mit **Neuen Tag beginnen**. Beim Datumswechsel wird zuerst
 der bisherige Tag gespeichert und anschließend der gewählte Tag geladen. Das
 Datumsfeld benennt keinen bestehenden Datensatz um.
+
+Ein Klick auf das Datum öffnet denselben Kalender wie in der History. Gespeicherte
+Tage sind nach Arbeit, Ferien und Kompensation markiert; der ausgewählte Tag ist
+zusätzlich hervorgehoben. In der Hauptansicht lassen sich auch leere Tage wählen.
+Die Monatsnavigation und das Schließen des Kalenders ändern die Erfassung nicht.
+Markierungen zeigen gespeicherte History-Einträge, keine noch offenen Entwürfe.
+Der Kalenderdialog verwendet eine kompakte Monatsansicht mit schmalen Abständen
+und zeigt keine zusätzliche Überschrift und keinen Bedienhinweis.
+Er schließt durch einen Klick außerhalb des Dialogs oder mit Escape und benötigt
+keinen Schließen-Button. Klicks innerhalb des Kalenders schließen ihn nur bei
+erfolgreicher Tagesauswahl.
 
 - **Neuen Tag beginnen:** Angezeigten Tag speichern, dann leere Erfassung für heute.
 - **Tag zurücksetzen:** Aktuelle Erfassung ohne History-Speicherung verwerfen, dann
@@ -43,17 +56,57 @@ in der History entfernt alle Einträge dieses Datums.
 History und Statistik öffnen sich als eigene kleine Browserfenster im bestehenden
 Design. Dabei schließt Chromium das Toolbar-Popup; der Entwurf wird vorher
 gesichert. Die History bietet ausschließlich Ansicht und Löschen, keine Bearbeitung.
+Unter dem Kalender erscheinen nur Leerzustands- und Löschmeldungen, keine Bedienhinweise.
 Das Datum ist nur in der Hauptansicht bearbeitbar. Ein geöffneter Entwurf wechselt
 auch um Mitternacht nicht automatisch auf ein anderes Datum.
+
+## History sichern und laden
+
+In den **Einstellungen** unter **History sichern und laden** stehen folgende Aktionen:
+
+- **History exportieren:** Lädt eine JSON-Datei mit allen gespeicherten Tagen,
+  einschließlich Zeiten, Pausen, Tagesarten, Feriengutschriften und Sollstundenverlauf,
+  herunter. Die aktuelle Erfassung ist nicht enthalten; diese bei Bedarf zuerst mit
+  einem Datumswechsel oder **Neuen Tag beginnen** in der History speichern.
+- **History importieren:** Unter **Beim Import** zuerst eine Option wählen, dann eine
+  zuvor exportierte JSON-Datei auswählen. **Vorhandene Tage behalten** ist voreingestellt
+  und ergänzt ausschließlich fehlende Tage. **Vorhandene Tage überschreiben** ersetzt
+  vorhandene Einträge desselben Datums durch die Werte aus der Datei und ergänzt
+  fehlende Tage. Tage ohne Gegenstück in der Datei bleiben erhalten. Bei doppelten
+  Datumswerten in der Datei gilt der erste Eintrag; bei lokalen Altduplikaten wird
+  wie bisher nur der erste Eintrag dieses Datums aktualisiert. Wiederholtes Importieren
+  identischer Werte erzeugt weder Duplikate noch zusätzliche Änderungen.
+- **Alle Datensätze löschen:** Leert nach einer zusätzlichen Bestätigung die gesamte
+  History, einschließlich Altduplikaten. **Abbrechen** verändert keine Daten.
+  Einstellungen und aktuelle Erfassung bleiben erhalten. Hat sich die History seit
+  der Bestätigungsabfrage geändert, wird das Löschen abgewiesen und muss erneut
+  aufgerufen und bestätigt werden. Ein unveränderter offener Entwurf stellt gelöschte
+  Tage nicht automatisch wieder her; ein bearbeiteter betroffener Entwurf bleibt mit
+  Konfliktanzeige sichtbar. Das Löschen kann nur über eine zuvor exportierte Sicherung
+  rückgängig gemacht werden.
+
+Bei leerer History übernimmt der Import auch den Sollstundenverlauf bis gestern,
+damit frühere Statistiken wiederhergestellt werden. Ab heute gelten weiterhin die
+lokalen Wochenstunden. Bei bereits vorhandener History bleibt der gesamte lokale
+Sollstundenverlauf maßgebend. Darstellung und aktuelle Feriengutschrift bleiben
+erhalten. Eine unveränderte geladene Erfassung wird beim Überschreiben ihres Tages
+aktualisiert. Leere zurückgesetzte und bereits bearbeitete Erfassungen bleiben erhalten.
+Betrifft ein importierter neuer oder geänderter Tag eine bearbeitete Erfassung,
+schützt die bestehende Konfliktanzeige vor versehentlichem Überschreiben.
+
+Fehlerhafte Dateien, unbekannte Dateiversionen und Dateien über 10 MB werden mit
+einer Fehlermeldung abgewiesen. Die Datei wird vollständig geprüft, bevor der
+Hintergrundprozess die Daten gemeinsam speichert. Bei Speicherfehlern wird kein
+erfolgreicher Import angezeigt. Sicherungen werden ausschließlich lokal verarbeitet.
+Die Exportdatei enthält persönliche Arbeitszeiten und kann an einem selbst gewählten
+Ort aufbewahrt werden.
 
 ## Tagesarten und Einstellungen
 
 **Arbeitstag**, **Ferientag** und **Überzeitkompensation** schließen sich aus.
 Bei Ferien oder Kompensation bleiben vorhandene Arbeitszeiten und Pausen erhalten,
 sind aber deaktiviert und werden nicht angerechnet. Nach Entfernen der Markierung
-sind sie wieder nutzbar. „Feierabend jetzt“ steht für heutige Arbeitstage zur
-Verfügung und setzt die aktuelle Uhrzeit auch ohne bereits erfassten Arbeitsbeginn.
-Der Beginn kann anschließend ergänzt werden; andere Tage lassen sich manuell erfassen.
+sind sie wieder nutzbar. Arbeitsbeginn und Feierabend werden manuell erfasst.
 
 - **Ferientag:** Beim Markieren wird die aktuelle Feriengutschrift im Tag gespeichert
   (Standard 8,5 Stunden). Änderungen der Einstellung gelten nur für anschließend neu
@@ -124,6 +177,12 @@ Bei einem Konflikt bleibt die Erfassung sichtbar und es erscheint ein Hinweis.
 Nach einer Aktualisierung der Dateien auf der Erweiterungsseite den runden
 **Neu laden**-Button der Erweiterung anklicken.
 
+Meldet der Import „Unbekannte Speicheraktion“ oder einen noch nicht aktuellen
+Hintergrundprozess, läuft noch der Hintergrundcode einer früheren Version.
+Die Erweiterung über diesen Button neu laden, das Popup erneut öffnen und die
+JSON-Datei nochmals importieren. Ein bloßes Schließen und Öffnen des Popups
+aktualisiert den Hintergrundprozess nicht zuverlässig.
+
 Die Daten verlassen den Browser nicht. Beim Entfernen der Erweiterung können die
 gespeicherten Werte ebenfalls gelöscht werden.
 
@@ -140,7 +199,7 @@ npm run check
 
 Die Tests prüfen Berechnungen, Migration, Speicherübergänge und Bedienabläufe mit
 simuliertem Browser-Speicher. Die DOM-Prüfungen ersetzen keine visuelle Kontrolle
-von Layout, nativen Datumsfeldern und Popup-Verhalten im echten Chromium.
+von Layout, Kalenderdialog und Popup-Verhalten im echten Chromium.
 
 Der freigegebene Umfang und die Akzeptanzkriterien stehen in
 [docs/history-statistics-plan.md](docs/history-statistics-plan.md).

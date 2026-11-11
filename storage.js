@@ -1,6 +1,11 @@
 export async function send(command) {
   const response = await chrome.runtime.sendMessage({ channel: "workinghours", command });
-  if (!response?.ok) throw new Error(response?.error ?? "Die Daten konnten nicht gespeichert werden. Bitte erneut versuchen.");
+  if (!response?.ok) {
+    if (["importHistory", "importHistoryWithMode", "deleteAllHistory"].includes(command.type) && response?.error === "Unbekannte Speicheraktion.") {
+      throw new Error("Der Hintergrundprozess ist noch nicht aktuell. Bitte die Erweiterung auf der Erweiterungsseite über den runden Pfeil neu laden und danach erneut versuchen.");
+    }
+    throw new Error(response?.error ?? "Die Daten konnten nicht gespeichert werden. Bitte erneut versuchen.");
+  }
   return response.data;
 }
 

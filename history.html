@@ -4,14 +4,8 @@
 <body class="window-page">
   <main>
     <header><div><p class="eyebrow">GESPEICHERTE TAGE</p><h1>History</h1></div><button id="closeWindow" class="icon-button" type="button" aria-label="History schließen">×</button></header>
-    <section class="card calendar-card" aria-label="Gespeicherte Tage im Kalender">
-      <div class="calendar-heading"><button id="previousMonth" class="icon-button" type="button" aria-label="Vorheriger Monat">←</button><h2 id="monthLabel" aria-live="polite"></h2><button id="nextMonth" class="icon-button" type="button" aria-label="Nächster Monat">→</button></div>
-      <div class="calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
-      <div id="calendarDays" class="calendar-days"></div>
-      <div class="calendar-legend"><span class="legend-work">Arbeit</span><span class="legend-vacation">Ferien</span><span class="legend-compensation">Kompensation</span></div>
-    </section>
-    <p id="historyHint" class="settings-note" role="status">Gespeicherte Tage auswählen, um Details zu öffnen.</p>
-    <p class="hint">Aktuelle Eingaben gelangen beim Datumswechsel oder mit „Neuen Tag beginnen“ in die History.</p>
+    <section id="historyCalendar" class="card calendar-card" aria-label="Gespeicherte Tage im Kalender"></section>
+    <p id="historyHint" class="settings-note" role="status" hidden></p>
     <p id="error" class="error-message" role="alert" hidden></p>
     <button id="openStatistics" class="primary full-width" type="button">Statistik öffnen</button>
   </main>
