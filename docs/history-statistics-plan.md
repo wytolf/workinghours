@@ -49,7 +49,7 @@ lokalen Datei war durch die Browserrichtlinie gesperrt.
   keinen vorhandenen. Leere Pausenzeilen zählen nicht als Inhalt. Unvollständige
   Erfassungen mit Inhalt sind speicherbar.
 - Gespeicherte Einträge werden ausschließlich über die Löschfunktion der History
-  entfernt.
+  oder die am 06.11.2026 ergänzte Aktion „Alle Datensätze löschen“ entfernt.
 - Tagesarten sind Arbeit, Ferien und vollständige Überzeitkompensation. Sie
   schließen sich gegenseitig aus. Vorhandene Zeiten und Pausen bleiben bei Ferien
   oder Kompensation erhalten, sind deaktiviert und werden nicht angerechnet.
@@ -465,20 +465,34 @@ gekennzeichneten Festlegungen.
 - Zwei Aktionen in den Einstellungen sichern und laden eine lokale JSON-Datei
   (`workinghours-history`, Dateiversion 1). Enthalten sind gespeicherte Tage und
   der Sollstundenverlauf; der Entwurf und weitere Einstellungen sind ausgenommen.
-- Der Import ergänzt fehlende Datumswerte, erhält vorhandene Einträge und verwendet
-  bei Duplikaten in der Datei den ersten. Interne IDs und Revisionen werden neu
-  vergeben. Wiederholter Import ist ohne weitere Änderung möglich.
+- Seit der Ergänzung vom 06.11.2026 bietet der Import die Auswahl „Vorhandene Tage
+  behalten“ (Standard) oder „Vorhandene Tage überschreiben“. Fehlende Datumswerte
+  werden ergänzt; beim Überschreiben wird der erste lokale Eintrag desselben Datums
+  ersetzt. Andere Datumswerte und lokale Altduplikate bleiben erhalten. Bei Duplikaten
+  in der Datei gilt der erste. Neue Tage erhalten neue IDs und Revision 1; ersetzte
+  Tage behalten ihre ID und erhalten eine höhere Revision. Identische Werte werden
+  nicht erneut geschrieben.
 - Bei leerer History wird der importierte Sollverlauf bis gestern übernommen.
   Ab heute bleiben die lokalen Wochenstunden wirksam. Bei vorhandener History
   bleibt der lokale Sollverlauf unverändert.
 - Der Hintergrundprozess validiert die vollständige Sicherung und speichert atomar
   innerhalb seiner bisherigen Warteschlange. Ungültige Dateien oder unbekannte
   Versionen verändern keine Daten. Die Dateiauswahl akzeptiert höchstens 10 MB.
-- Eine offene Erfassung bleibt erhalten. Bei einem bearbeiteten Entwurf für einen
-  neu importierten Tag wird ein Konflikt gesetzt; veraltete Entwurfsrevisionen
-  dürfen die importierten Daten nicht überschreiben.
+- Eine unveränderte geladene Erfassung wird nach dem Überschreiben ihres Tages
+  aktualisiert. Ein leerer zurückgesetzter oder bereits bearbeiteter Entwurf bleibt
+  erhalten. Betrifft der Import einen bearbeiteten Entwurf, wird ein Konflikt gesetzt;
+  veraltete Entwurfsrevisionen dürfen die importierten Daten nicht überschreiben.
+- „Alle Datensätze löschen“ in den Einstellungen leert die History einschließlich
+  Altduplikaten nach Bestätigung. Einstellungen und Erfassung bleiben erhalten.
+  Die Bestätigung gilt für den zu diesem Zeitpunkt bekannten History-Bestand;
+  zwischenzeitliche Änderungen verhindern das Löschen. Unveränderte offene Entwürfe
+  dürfen gelöschte Tage nicht wiederherstellen; bearbeitete betroffene Entwürfe werden
+  als Konflikt erhalten. Ohne History ist die Aktion deaktiviert.
 - Automatisierte Prüfungen decken JSON-Rundlauf mit unveränderter historischer
   Statistik, Tagesarten, Pausen, unvollständige Tage, Duplikate, ungültige Dateien,
-  Dateigröße, Speicherfehler, gleichzeitige Änderungen und die Einstellungsaktionen ab.
-- Eine visuelle Prüfung der Ergänzung im echten Chromium konnte wegen der
-  Browserrichtlinie für lokale Dateien nicht durchgeführt werden.
+  Dateigröße, Speicherfehler, beide Importoptionen, bestätigtes Gesamtlöschen,
+  gleichzeitige Änderungen und die Einstellungsaktionen ab.
+- Die Ergänzung wurde im Erweiterungspopup von Microsoft Edge (Chromium) mit
+  einem separaten Testprofil in Hell und Dunkel geprüft. Beide Importoptionen,
+  JSON-Download, fehlerhafte Datei sowie Abbruch und Bestätigung beim Löschen
+  wurden überprüft.

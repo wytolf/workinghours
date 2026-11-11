@@ -81,8 +81,10 @@ function importFile(text, size = text.length) {
   event(input, "change");
 }
 
-test("settings export a JSON download with current history and no draft", async () => {
-  const initial = migrate(null, today); initial.history = [day(yesterday)];
+test("settings export a large history within the import limit and without a draft", async () => {
+  const initial = migrate(null, today);
+  const breaks = Array.from({ length: 250 }, () => ({ start: "12:00", end: "12:01" }));
+  initial.history = Array.from({ length: 1000 }, (_, index) => day(shiftDate(yesterday, -index), { breaks }));
   await mount("popup", initial); click("#openSettings");
   const originalCreate = URL.createObjectURL, originalRevoke = URL.revokeObjectURL;
   const originalTimeout = globalThis.setTimeout;
@@ -94,12 +96,14 @@ test("settings export a JSON download with current history and no draft", async 
   window.HTMLElement.prototype.click = function () { if (this.tagName === "A") link = this; };
   try {
     click("#exportHistory"); await flush();
+    assert.ok(blob.size <= MAX_BACKUP_BYTES);
     const backup = JSON.parse(await blob.text());
     assert.equal(backup.history[0].date, yesterday);
+    assert.equal(backup.history.length, initial.history.length);
     assert.equal(backup.draft, undefined);
     assert.equal(link.getAttribute("download"), `arbeitszeit-history-${today}.json`);
     assert.equal(revoked, "blob:test-history");
-    assert.match(document.querySelector("#backupStatus").textContent, /1 gespeicherten Tagen/);
+    assert.match(document.querySelector("#backupStatus").textContent, /1000 gespeicherten Tagen/);
     assert.equal(document.querySelector("#exportHistory").disabled, false);
     assert.deepEqual(stored[STORAGE_KEY], initial);
   } finally {
@@ -127,6 +131,22 @@ test("settings import a file, support repeating it and retain an edited draft", 
   assert.equal(document.querySelector("#workStart").value, "9:00");
 });
 
+test("an outdated background worker shows extension reload instructions without changing history", async () => {
+  await mount("popup"); click("#openSettings");
+  const before = structuredClone(stored[STORAGE_KEY]);
+  const saved = migrate(null, today); saved.history = [day(yesterday)];
+  const original = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = async message => message.command.type === "importHistoryWithMode"
+    ? { ok: false, error: "Unbekannte Speicheraktion." } : original(message);
+  try {
+    importFile(JSON.stringify(createHistoryBackup(saved))); await flush();
+    assert.match(document.querySelector("#settingsError").textContent, /Hintergrundprozess.*Erweiterung.*neu laden/);
+    assert.equal(document.querySelector("#backupStatus").hidden, true);
+    assert.equal(document.querySelector("#importHistory").disabled, false);
+    assert.deepEqual(stored[STORAGE_KEY], before);
+  } finally { chrome.runtime.sendMessage = original; }
+});
+
 test("settings reject malformed or oversized files and report write failures without success", async () => {
   await mount("popup"); click("#openSettings");
   const before = structuredClone(stored[STORAGE_KEY]);
@@ -143,6 +163,63 @@ test("settings reject malformed or oversized files and report write failures wit
   assert.match(document.querySelector("#settingsError").textContent, /Speicher voll/);
   assert.equal(document.querySelector("#backupStatus").hidden, true);
   assert.deepEqual(stored[STORAGE_KEY], before);
+});
+
+test("settings import uses the selected conflict option for matching dates", async () => {
+  const initial = migrate(null, today), saved = migrate(null, today);
+  initial.history = [day(yesterday), day(shiftDate(today, -2))];
+  saved.history = [day(yesterday, { workEnd: "18:00" })];
+  await mount("popup", initial); click("#openSettings");
+  assert.equal(document.querySelector("#historyImportMode").value, "keep");
+  const json = JSON.stringify(createHistoryBackup(saved));
+  importFile(json); await flush();
+  assert.equal(stored[STORAGE_KEY].history[0].workEnd, "16:00");
+  const select = document.querySelector("#historyImportMode");
+  select.querySelector('[value="keep"]').selected = false;
+  select.querySelector('[value="overwrite"]').selected = true;
+  importFile(json); await flush();
+  assert.equal(stored[STORAGE_KEY].history[0].workEnd, "18:00");
+  assert.deepEqual(stored[STORAGE_KEY].history[1], initial.history[1]);
+  assert.match(document.querySelector("#backupStatus").textContent, /überschrieben/);
+});
+
+test("delete all requires confirmation, supports cancellation and leaves an empty history after navigation", async () => {
+  const initial = migrate(null, today); initial.history = [day(today), day(yesterday)];
+  initial.draft = draftFor(today, initial.history);
+  await mount("popup", initial); click("#openSettings");
+  click("#confirmDeleteHistory"); await flush();
+  assert.equal(stored[STORAGE_KEY].history.length, 2);
+  click("#deleteAllHistory");
+  assert.equal(document.querySelector("#deleteHistoryConfirmation").hidden, false);
+  assert.equal(document.activeElement.id, "cancelDeleteHistory");
+  click("#cancelDeleteHistory");
+  assert.equal(document.querySelector("#deleteHistoryConfirmation").hidden, true);
+  assert.equal(stored[STORAGE_KEY].history.length, 2);
+  click("#deleteAllHistory"); click("#confirmDeleteHistory"); await flush();
+  assert.equal(stored[STORAGE_KEY].history.length, 0);
+  assert.deepEqual(stored[STORAGE_KEY].settings, initial.settings);
+  assert.equal(document.querySelector("#deleteAllHistory").disabled, true);
+  assert.equal(document.querySelector("#deleteHistoryConfirmation").hidden, true);
+  assert.match(document.querySelector("#backupStatus").textContent, /gelöscht/);
+  click("#closeSettings");
+  assert.equal(document.querySelector("#workStart").value, "08:00");
+  chooseDate(yesterday); await flush();
+  assert.equal(stored[STORAGE_KEY].history.length, 0);
+});
+
+test("delete all does not hide write errors or delete entries added after confirmation", async () => {
+  const initial = migrate(null, today); initial.history = [day(yesterday)];
+  await mount("popup", initial); click("#openSettings");
+  click("#deleteAllHistory"); failWrite = true; click("#confirmDeleteHistory"); await flush();
+  assert.equal(stored[STORAGE_KEY].history.length, 1);
+  assert.equal(document.querySelector("#backupStatus").hidden, true);
+  assert.match(document.querySelector("#settingsError").textContent, /Speicher voll/);
+  click("#deleteAllHistory");
+  const incoming = migrate(null, today); incoming.history = [day(shiftDate(today, -2))];
+  await enqueue({ type: "importHistory", backup: createHistoryBackup(incoming) }); await flush();
+  click("#confirmDeleteHistory"); await flush();
+  assert.equal(stored[STORAGE_KEY].history.length, 2);
+  assert.match(document.querySelector("#settingsError").textContent, /erneut aufrufen/);
 });
 
 test("manual end entry persists without an end now action", async () => {

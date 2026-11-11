@@ -122,13 +122,26 @@
 
         <section class="card backup-card" aria-labelledby="backupHeading">
           <h2 id="backupHeading">History sichern und laden</h2>
-          <p class="hint">JSON-Datei mit gespeicherten Tagen und Sollstundenverlauf. Die aktuelle Erfassung ist nicht enthalten. Beim Import bleiben vorhandene Tage erhalten.</p>
-          <p class="hint">Das frühere Soll wird bei leerer History übernommen. Bei vorhandener History gilt der lokale Sollverlauf.</p>
+          <div class="field import-mode">
+            <label for="historyImportMode">Beim Import</label>
+            <select id="historyImportMode" class="time-input">
+              <option value="keep" selected>Vorhandene Tage behalten</option>
+              <option value="overwrite">Vorhandene Tage überschreiben</option>
+            </select>
+          </div>
           <div class="backup-actions">
             <button id="exportHistory" class="secondary" type="button">History exportieren</button>
             <button id="importHistory" class="secondary" type="button">History importieren</button>
           </div>
           <input id="historyFile" type="file" accept=".json,application/json" aria-label="History-Sicherung auswählen" hidden />
+          <button id="deleteAllHistory" class="secondary danger-text delete-history" type="button">Alle Datensätze löschen</button>
+          <div id="deleteHistoryConfirmation" class="delete-confirmation" role="group" aria-label="Gesamte History löschen" hidden>
+            <p>Alle gespeicherten History-Einträge endgültig löschen? Einstellungen und aktuelle Erfassung bleiben erhalten.</p>
+            <div class="dialog-actions">
+              <button id="cancelDeleteHistory" class="secondary" type="button">Abbrechen</button>
+              <button id="confirmDeleteHistory" class="danger" type="button">Alle löschen</button>
+            </div>
+          </div>
           <p id="backupStatus" class="hint" role="status" hidden></p>
         </section>
         <p class="settings-note">Änderungen werden automatisch gespeichert.</p>

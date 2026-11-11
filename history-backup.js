@@ -52,26 +52,42 @@ export function parseHistoryBackup(text) {
 }
 
 // Called only inside the background worker's serialized storage command.
-export function importHistory(data, value, today, makeId) {
+export function importHistory(data, value, today, makeId, mode = "keep") {
+  if (!["keep", "overwrite"].includes(mode)) throw new Error("Bitte eine gültige Importoption wählen.");
   const backup = validateHistoryBackup(value);
   const existing = canonicalDays(data.history);
-  const incoming = [...canonicalDays(backup.history).values()].filter(day => !existing.has(day.date));
-  if (!incoming.length) return false;
+  const incoming = [...canonicalDays(backup.history).values()].filter(day => {
+    const saved = existing.get(day.date);
+    return !saved || (mode === "overwrite" && JSON.stringify(dayFields(saved)) !== JSON.stringify(day));
+  });
+  let scheduleChanged = false;
   if (!data.history.length) {
     const localSchedule = data.settings.targetSchedule;
-    data.settings.targetSchedule = { baselineWeeklyMinutes: backup.targetSchedule.baselineWeeklyMinutes,
+    const targetSchedule = { baselineWeeklyMinutes: backup.targetSchedule.baselineWeeklyMinutes,
       changes: [...backup.targetSchedule.changes.filter(change => change.effectiveFrom < today),
-        { effectiveFrom: today, weeklyTargetMinutes: weeklyTarget(data.settings, today) },
-        ...localSchedule.changes.filter(change => change.effectiveFrom > today)].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom)) };
+        ...localSchedule.changes.filter(change => change.effectiveFrom >= today)] };
+    const weeklyTargetMinutes = weeklyTarget(data.settings, today);
+    if (weeklyTarget({ targetSchedule }, today) !== weeklyTargetMinutes) {
+      targetSchedule.changes.push({ effectiveFrom: today, weeklyTargetMinutes });
+    }
+    targetSchedule.changes.sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+    scheduleChanged = JSON.stringify(targetSchedule) !== JSON.stringify(localSchedule);
+    if (scheduleChanged) data.settings.targetSchedule = targetSchedule;
   }
   for (const day of incoming) {
-    data.history.push({ ...day, id: makeId(), revision: 1 });
+    const saved = existing.get(day.date);
+    const record = { ...day, id: saved?.id ?? makeId(), revision: (saved?.revision ?? 0) + 1 };
+    if (saved) data.history[data.history.indexOf(saved)] = record;
+    else data.history.push(record);
     if (data.draft.date === day.date) {
-      // Keep the visible draft; explicit editing/reset resolves the new history reference.
+      // Keep edited inputs; refresh an unchanged loaded entry after replacement.
       if (data.draft.changedSinceLoad) data.draft.conflict = true;
-      else data.draft.historyReference = { id: data.history.at(-1).id, revision: 1 };
+      else {
+        if (saved && JSON.stringify(dayFields(data.draft)) === JSON.stringify(dayFields(saved))) Object.assign(data.draft, dayFields(record));
+        data.draft.historyReference = { id: record.id, revision: record.revision };
+      }
       data.draftRevision++;
     }
   }
-  return true;
+  return incoming.length > 0 || scheduleChanged;
 }

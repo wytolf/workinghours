@@ -31,6 +31,26 @@ test("history import serializes with settings and preserves all unrelated stored
   assert.deepEqual(stored[LEGACY_KEY], { workStart: "08:00" });
 });
 
+test("overwrite import and bulk deletion serialize with other writes without removing settings or legacy data", async () => {
+  const initial = migrate(null, localDate()), incoming = migrate(null, localDate());
+  initial.history = [{ ...emptyDay("2026-10-01"), workStart: "08:00", id: "original", revision: 1 }];
+  incoming.history = [{ ...initial.history[0], workEnd: "17:00" }];
+  stored = { [STORAGE_KEY]: initial, [LEGACY_KEY]: { workStart: "08:00" } };
+  await Promise.all([enqueue({ type: "settings", patch: { theme: "dark" } }),
+    enqueue({ type: "importHistoryWithMode", backup: createHistoryBackup(incoming), mode: "overwrite" })]);
+  assert.equal(stored[STORAGE_KEY].history[0].workEnd, "17:00");
+  const before = structuredClone(stored[STORAGE_KEY]);
+  failWrite = true;
+  await assert.rejects(enqueue({ type: "deleteAllHistory", expectedHistory: before.history }), /Speicher voll/);
+  assert.deepEqual(stored[STORAGE_KEY], before);
+  await Promise.all([enqueue({ type: "settings", patch: { vacationCreditMinutes: 480 } }),
+    enqueue({ type: "deleteAllHistory", expectedHistory: before.history })]);
+  assert.deepEqual(stored[STORAGE_KEY].history, []);
+  assert.equal(stored[STORAGE_KEY].settings.theme, "dark");
+  assert.equal(stored[STORAGE_KEY].settings.vacationCreditMinutes, 480);
+  assert.deepEqual(stored[LEGACY_KEY], { workStart: "08:00" });
+});
+
 test("migration is durable and idempotent, and preserves the original undated source", async () => {
   stored = { [LEGACY_KEY]: { workStart: "08:00", targetTime: "08:30", theme: "dark", breaks: [] } };
   const first = await enqueue({ type: "read" });

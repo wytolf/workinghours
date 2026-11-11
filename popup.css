@@ -384,5 +384,7 @@ dialog button.ghost { width: 100%; margin-top: 12px; }
 .hint { line-height: 1.5; }
 .settings-note { line-height: 1.6; }
 .backup-card { margin-top: 12px; }
+.import-mode { margin-top: 12px; }
+.delete-history { width: 100%; margin-top: 8px; }
 .backup-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .empty-state p { font-size: 13px; line-height: 1.7; color: var(--text-muted); }

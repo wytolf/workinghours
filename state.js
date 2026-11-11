@@ -89,8 +89,24 @@ export function applyCommand(current, command, today, makeId = () => crypto.rand
   }
   switch (command.type) {
     case "importHistory":
-      if (!importHistory(data, command.backup, today, makeId)) return current;
+    case "importHistoryWithMode":
+      if (!importHistory(data, command.backup, today, makeId, command.type === "importHistory" ? "keep" : command.mode)) return current;
       break;
+    case "deleteAllHistory": {
+      const expected = command.expectedHistory;
+      if (!Array.isArray(expected) || expected.length !== data.history.length || !expected.every((day, index) => day &&
+          day.date === data.history[index].date && day.id === data.history[index].id && day.revision === data.history[index].revision)) {
+        throw new Error("Die History wurde inzwischen geändert. Bitte das Löschen erneut aufrufen und bestätigen.");
+      }
+      if (!data.history.length) return current;
+      if (canonicalDays(data.history).has(data.draft.date)) {
+        if (data.draft.changedSinceLoad) data.draft.conflict = true;
+        else { data.draft.historyReference = null; data.draft.suppressedAfterDeletion = true; }
+        data.draftRevision++;
+      }
+      data.history = [];
+      break;
+    }
     case "saveDraft": {
       const before = JSON.stringify(dayFields(data.draft));
       const fields = command.fields;

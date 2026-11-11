@@ -12,7 +12,8 @@ Ferien, Überzeitkompensation und Statistiken. Alle Daten bleiben im Browser.
 - Live-Berechnung für den heutigen Tag, solange kein Feierabend eingetragen ist
 - Anzeige von Arbeitszeit, Überzeit und Minuszeit
 - Eigene Einstellungen für Wochenstunden, Feriengutschrift sowie Hell- und Dunkelmodus
-- History in den Einstellungen als JSON-Datei exportieren und wieder importieren
+- History als JSON-Datei exportieren und mit wählbarem Überschreiben importieren
+- Gesamte History in den Einstellungen nach Bestätigung löschen
 - Automatische lokale Speicherung über `chrome.storage.local`
 - Tagesauswahl mit automatischer History-Speicherung vor dem Datumswechsel
 - Kalender mit markierten gespeicherten Tagen, Tagesdetails und Löschfunktion
@@ -61,24 +62,37 @@ auch um Mitternacht nicht automatisch auf ein anderes Datum.
 
 ## History sichern und laden
 
-In den **Einstellungen** unter **History sichern und laden** stehen zwei Aktionen:
+In den **Einstellungen** unter **History sichern und laden** stehen folgende Aktionen:
 
 - **History exportieren:** Lädt eine JSON-Datei mit allen gespeicherten Tagen,
   einschließlich Zeiten, Pausen, Tagesarten, Feriengutschriften und Sollstundenverlauf,
   herunter. Die aktuelle Erfassung ist nicht enthalten; diese bei Bedarf zuerst mit
   einem Datumswechsel oder **Neuen Tag beginnen** in der History speichern.
-- **History importieren:** Eine zuvor exportierte JSON-Datei auswählen. Fehlende Tage
-  werden ergänzt. Bereits vorhandene Tage bleiben erhalten, auch bei abweichenden
-  Werten in der Datei. Bei doppelten Datumswerten in der Datei gilt der erste Eintrag.
-  Wiederholtes Importieren erzeugt keine Duplikate.
+- **History importieren:** Unter **Beim Import** zuerst eine Option wählen, dann eine
+  zuvor exportierte JSON-Datei auswählen. **Vorhandene Tage behalten** ist voreingestellt
+  und ergänzt ausschließlich fehlende Tage. **Vorhandene Tage überschreiben** ersetzt
+  vorhandene Einträge desselben Datums durch die Werte aus der Datei und ergänzt
+  fehlende Tage. Tage ohne Gegenstück in der Datei bleiben erhalten. Bei doppelten
+  Datumswerten in der Datei gilt der erste Eintrag; bei lokalen Altduplikaten wird
+  wie bisher nur der erste Eintrag dieses Datums aktualisiert. Wiederholtes Importieren
+  identischer Werte erzeugt weder Duplikate noch zusätzliche Änderungen.
+- **Alle Datensätze löschen:** Leert nach einer zusätzlichen Bestätigung die gesamte
+  History, einschließlich Altduplikaten. **Abbrechen** verändert keine Daten.
+  Einstellungen und aktuelle Erfassung bleiben erhalten. Hat sich die History seit
+  der Bestätigungsabfrage geändert, wird das Löschen abgewiesen und muss erneut
+  aufgerufen und bestätigt werden. Ein unveränderter offener Entwurf stellt gelöschte
+  Tage nicht automatisch wieder her; ein bearbeiteter betroffener Entwurf bleibt mit
+  Konfliktanzeige sichtbar. Das Löschen kann nur über eine zuvor exportierte Sicherung
+  rückgängig gemacht werden.
 
 Bei leerer History übernimmt der Import auch den Sollstundenverlauf bis gestern,
 damit frühere Statistiken wiederhergestellt werden. Ab heute gelten weiterhin die
 lokalen Wochenstunden. Bei bereits vorhandener History bleibt der gesamte lokale
 Sollstundenverlauf maßgebend. Darstellung und aktuelle Feriengutschrift bleiben
-erhalten. Die angezeigte Erfassung wird nicht durch die importierten Zeiten ersetzt.
-Ist sie bereits bearbeitet und betrifft einen neu importierten Tag, schützt die
-bestehende Konfliktanzeige vor versehentlichem Überschreiben.
+erhalten. Eine unveränderte geladene Erfassung wird beim Überschreiben ihres Tages
+aktualisiert. Leere zurückgesetzte und bereits bearbeitete Erfassungen bleiben erhalten.
+Betrifft ein importierter neuer oder geänderter Tag eine bearbeitete Erfassung,
+schützt die bestehende Konfliktanzeige vor versehentlichem Überschreiben.
 
 Fehlerhafte Dateien, unbekannte Dateiversionen und Dateien über 10 MB werden mit
 einer Fehlermeldung abgewiesen. Die Datei wird vollständig geprüft, bevor der
@@ -162,6 +176,12 @@ Bei einem Konflikt bleibt die Erfassung sichtbar und es erscheint ein Hinweis.
 
 Nach einer Aktualisierung der Dateien auf der Erweiterungsseite den runden
 **Neu laden**-Button der Erweiterung anklicken.
+
+Meldet der Import „Unbekannte Speicheraktion“ oder einen noch nicht aktuellen
+Hintergrundprozess, läuft noch der Hintergrundcode einer früheren Version.
+Die Erweiterung über diesen Button neu laden, das Popup erneut öffnen und die
+JSON-Datei nochmals importieren. Ein bloßes Schließen und Öffnen des Popups
+aktualisiert den Hintergrundprozess nicht zuverlässig.
 
 Die Daten verlassen den Browser nicht. Beim Entfernen der Erweiterung können die
 gespeicherten Werte ebenfalls gelöscht werden.

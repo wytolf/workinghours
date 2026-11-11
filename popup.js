@@ -8,6 +8,7 @@ import { applyTheme, onDataChanged, openWindow, send } from "./storage.js";
 const $ = selector => document.querySelector(selector);
 let data, view, queue = Promise.resolve(), pending = 0, external = null, version = 0, busy = true;
 let unsaved = false, stale = false;
+let historyDeletion = null;
 let breakPage = 0, breakCounter = 0;
 const BREAKS_PER_PAGE = 2;
 const dateDialog = $("#dateDialog");
@@ -94,10 +95,11 @@ function edited() {
 
 function setBusy(value) {
   busy = value;
-  for (const element of document.querySelectorAll("button, input")) element.disabled = value;
+  for (const element of document.querySelectorAll("button, input, select")) element.disabled = value;
   if (!value) {
     $("#timeFields").disabled = view.kind !== "work";
     updateBreakPagination();
+    $("#deleteAllHistory").disabled = !data.history.length;
   }
   if (data) renderDatePicker();
 }
@@ -210,6 +212,7 @@ function calculate() {
 }
 
 function renderSettings() {
+  $("#deleteAllHistory").disabled = busy || !data.history.length;
   const hours = value => Number((value / 60).toFixed(4)).toLocaleString("de-CH", { maximumFractionDigits: 4, useGrouping: false });
   if (document.activeElement !== $("#weeklyHours")) $("#weeklyHours").value = hours(weeklyTarget(data.settings, localDate()));
   if (document.activeElement !== $("#vacationHours")) $("#vacationHours").value = hours(data.settings.vacationCreditMinutes);
@@ -262,7 +265,7 @@ for (const [id, other] of [["vacationDay", "compensationDay"], ["compensationDay
 $("#openSettings").addEventListener("click", () => {
   $("#mainView").hidden = true; $("#settingsView").hidden = false; renderSettings(); $("#weeklyHours").focus();
 });
-$("#closeSettings").addEventListener("click", () => { $("#settingsView").hidden = true; $("#mainView").hidden = false; $("#openSettings").focus(); });
+$("#closeSettings").addEventListener("click", () => { cancelHistoryDeletion(); $("#settingsView").hidden = true; $("#mainView").hidden = false; $("#openSettings").focus(); });
 
 function saveSettings(patch) {
   clearErrors();
@@ -289,6 +292,7 @@ for (const button of document.querySelectorAll("[data-theme-option]")) button.ad
 
 function transferHistory(task) {
   if (busy) return;
+  cancelHistoryDeletion();
   clearErrors();
   $("#backupStatus").hidden = true;
   setBusy(true);
@@ -298,7 +302,7 @@ function transferHistory(task) {
 $("#exportHistory").addEventListener("click", () => transferHistory(async () => {
   const latest = await send({ type: "read" });
   const backup = createHistoryBackup(latest);
-  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = `arbeitszeit-history-${localDate()}.json`;
@@ -312,17 +316,47 @@ $("#exportHistory").addEventListener("click", () => transferHistory(async () => 
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 }));
-$("#importHistory").addEventListener("click", () => { if (!busy) $("#historyFile").click(); });
+$("#importHistory").addEventListener("click", () => {
+  if (busy) return;
+  cancelHistoryDeletion();
+  $("#historyFile").click();
+});
 $("#historyFile").addEventListener("change", () => {
   const file = $("#historyFile").files?.[0];
   $("#historyFile").value = "";
   if (!file) return;
+  const mode = $("#historyImportMode").value;
   transferHistory(async () => {
     if (file.size > MAX_BACKUP_BYTES) throw new Error("Die Sicherung darf höchstens 10 MB groß sein. Es wurden keine Daten importiert.");
     const backup = parseHistoryBackup(await file.text());
-    const updated = await send({ type: "importHistory", backup });
+    const updated = await send({ type: "importHistoryWithMode", backup, mode });
     acceptExternal(updated);
-    $("#backupStatus").textContent = "Import abgeschlossen. Fehlende Tage wurden ergänzt; vorhandene Tage bleiben erhalten.";
+    $("#backupStatus").textContent = mode === "overwrite"
+      ? "Import abgeschlossen. Tage aus der Datei wurden übernommen; vorhandene Tage desselben Datums wurden überschrieben."
+      : "Import abgeschlossen. Fehlende Tage wurden ergänzt; vorhandene Tage bleiben erhalten.";
+    $("#backupStatus").hidden = false;
+  });
+});
+
+function cancelHistoryDeletion() {
+  historyDeletion = null;
+  $("#deleteHistoryConfirmation").hidden = true;
+}
+$("#deleteAllHistory").addEventListener("click", () => {
+  if (busy || !data.history.length) return;
+  clearErrors();
+  $("#backupStatus").hidden = true;
+  historyDeletion = data.history.map(day => ({ date: day.date, id: day.id, revision: day.revision }));
+  $("#deleteHistoryConfirmation").hidden = false;
+  $("#cancelDeleteHistory").focus();
+});
+$("#cancelDeleteHistory").addEventListener("click", () => { cancelHistoryDeletion(); $("#deleteAllHistory").focus(); });
+$("#confirmDeleteHistory").addEventListener("click", () => {
+  if (busy || !historyDeletion) return;
+  const expectedHistory = historyDeletion;
+  transferHistory(async () => {
+    acceptExternal(await send({ type: "deleteAllHistory", expectedHistory }));
+    $("#backupStatus").textContent = "Alle History-Einträge wurden gelöscht.";
     $("#backupStatus").hidden = false;
   });
 });
