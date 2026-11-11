@@ -1,3 +1,5 @@
+import { locale, t } from "./i18n.js";
+
 export function localDate(now = new Date()) {
   return `${String(now.getFullYear()).padStart(4, "0")}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
@@ -28,5 +30,5 @@ export function weekStart(value) {
 }
 
 export function formatDate(value, options) {
-  return parseDate(value)?.toLocaleDateString("de-CH", options ?? { day: "2-digit", month: "2-digit", year: "numeric" }) ?? "Ohne Datum";
+  return parseDate(value)?.toLocaleDateString(locale(), options ?? { day: "2-digit", month: "2-digit", year: "numeric" }) ?? t("Ohne Datum");
 }

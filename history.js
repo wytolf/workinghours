@@ -3,6 +3,7 @@ import { formatDate } from "./dates.js";
 import { canonicalDays, dailyTarget } from "./statistics-calculations.js";
 import { calculateWork, formatDuration } from "./time-calculations.js";
 import { applyTheme, onDataChanged, openWindow, send } from "./storage.js";
+import { setLanguage, t, translateTree } from "./i18n.js";
 
 const $ = selector => document.querySelector(selector);
 const kindLabels = { work: "Arbeitstag", vacation: "Ferientag", compensation: "Überzeitkompensation" };
@@ -12,14 +13,17 @@ const calendar = createCalendar($("#historyCalendar"), { onSelect: (date, entry)
 
 function showError(error) {
   const target = dialog.open ? $("#detailError") : $("#error");
-  target.textContent = error.message; target.hidden = false;
+  target.textContent = t(error.message); target.hidden = false;
 }
 
 function renderCalendar() {
+  setLanguage(data.settings.language);
+  translateTree();
+  calendar.translate();
   applyTheme(data.settings.theme);
   calendar.update({ history: data.history });
   $("#historyHint").hidden = canonicalDays(data.history).size > 0;
-  $("#historyHint").textContent = $("#historyHint").hidden ? "" : "Noch keine Tage in der History gespeichert.";
+  $("#historyHint").textContent = $("#historyHint").hidden ? "" : t("Noch keine Tage in der History gespeichert.");
 }
 
 function detailRow(list, label, value) {
@@ -30,32 +34,32 @@ function detailRow(list, label, value) {
 function openDetails(day) {
   selected = day;
   $("#detailDate").textContent = formatDate(day.date, { weekday: "short", day: "numeric", month: "long", year: "numeric" });
-  $("#detailKind").textContent = kindLabels[day.kind];
+  $("#detailKind").textContent = t(kindLabels[day.kind]);
   $("#detailContent").replaceChildren();
   $("#detailError").hidden = true; $("#deleteConfirmation").hidden = true; $("#deleteDay").hidden = false;
   const list = document.createElement("dl"); list.className = "detail-list";
   const result = calculateWork(day), target = dailyTarget(data.settings, day.date);
   const worked = result.complete ? result.worked : 0, vacation = day.kind === "vacation" ? day.vacationCreditMinutes : 0;
-  detailRow(list, "Gearbeitet", `${formatDuration(worked)} Std.`);
-  if (day.kind === "vacation") detailRow(list, "Feriengutschrift", `${formatDuration(vacation)} Std.`);
-  detailRow(list, "Sollzeit", `${formatDuration(target)} Std.`);
-  detailRow(list, "Saldo", `${formatDuration(worked + vacation - target, true)} Std.`);
-  detailRow(list, "Arbeitsbeginn", day.workStart || "—"); detailRow(list, "Feierabend", day.workEnd || "—");
+  detailRow(list, t("Gearbeitet"), `${formatDuration(worked)} ${t("Std.")}`);
+  if (day.kind === "vacation") detailRow(list, t("Feriengutschrift"), `${formatDuration(vacation)} ${t("Std.")}`);
+  detailRow(list, t("Sollzeit"), `${formatDuration(target)} ${t("Std.")}`);
+  detailRow(list, t("Saldo"), `${formatDuration(worked + vacation - target, true)} ${t("Std.")}`);
+  detailRow(list, t("Arbeitsbeginn"), day.workStart || "—"); detailRow(list, t("Feierabend"), day.workEnd || "—");
   $("#detailContent").append(list);
   if (day.breaks.length) {
-    const heading = document.createElement("h3"); heading.textContent = "Pausen";
+    const heading = document.createElement("h3"); heading.textContent = t("Pausen");
     const pauses = document.createElement("ul"); pauses.className = "detail-breaks";
     for (const pause of day.breaks) {
       const item = document.createElement("li");
-      item.textContent = "duration" in pause ? `${pause.duration} Minuten (fest)` : `${pause.start || "offen"} – ${pause.end || "offen"}`;
+      item.textContent = "duration" in pause ? `${pause.duration} ${t("Minuten (fest)")}` : `${pause.start || t("offen")} – ${pause.end || t("offen")}`;
       pauses.append(item);
     }
     $("#detailContent").append(heading, pauses);
   }
   if (day.kind !== "work" || !result.complete) {
     const note = document.createElement("p"); note.className = "hint";
-    note.textContent = day.kind !== "work" ? "Vorhandene Arbeitszeiten und Pausen werden bei dieser Tagesart nicht angerechnet."
-      : "Unvollständiger Arbeitstag oder keine positive Nettozeit: zählt nicht als ausgefüllter Arbeitstag und liefert keine statistischen Arbeitsstunden.";
+    note.textContent = t(day.kind !== "work" ? "Vorhandene Arbeitszeiten und Pausen werden bei dieser Tagesart nicht angerechnet."
+      : "Unvollständiger Arbeitstag oder keine positive Nettozeit: zählt nicht als ausgefüllter Arbeitstag und liefert keine statistischen Arbeitsstunden.");
     $("#detailContent").append(note);
   }
   if (!dialog.open) dialog.showModal();
@@ -75,7 +79,7 @@ $("#confirmDelete").addEventListener("click", async () => {
     data = await send({ type: "deleteDay", date: day.date, id: day.id, recordRevision: day.revision });
     dialog.close(); renderCalendar();
     $("#historyHint").hidden = false;
-    $("#historyHint").textContent = `Eintrag vom ${formatDate(day.date)} gelöscht.`; $("#previousMonth").focus();
+    $("#historyHint").textContent = `${t("Eintrag vom")} ${formatDate(day.date)} ${t("gelöscht.")}`; $("#previousMonth").focus();
   } catch (error) { showError(error); }
   finally { deleting = false; $("#confirmDelete").disabled = false; }
 });
